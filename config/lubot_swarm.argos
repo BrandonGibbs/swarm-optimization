@@ -1,0 +1,96 @@
+<?xml version="1.0" ?>
+<!--
+  I recommend checking out argos3-examples/experiments/diffusion_1.argos
+  to understand how this configuration works. I've added comments to explain
+  what's going on very generally.
+-->
+<argos-configuration>
+  <!-- settings for simulation; not super important -->
+  <framework>
+    <system threads="0"/>
+    <experiment length="0" ticks_per_second="10"/>
+  </framework>
+
+  <!-- 
+    here's where we'll tell the simulator our robots' properties and 
+    where to find the code to control them
+  -->
+  <controllers>
+    <lubot_controller id="lbc" library="build/controllers/liblubot_controller.so">
+      <actuators>
+        <differential_steering implementation="default"/>
+        <range_and_bearing implementation="default"/>
+      </actuators>
+      <sensors>
+        <footbot_proximity implementation="default" show_rays="true"/>
+        <range_and_bearing implementation="medium" medium="rab"/>
+      </sensors>
+      <!-- 
+		add parameters in params to set initialization constants without
+		having to recompile
+	  -->
+      <params/> 
+    </lubot_controller>
+  </controllers>
+
+  <!-- 
+    To be researched further
+  -->
+  <!--loop_functions>
+  </loop_functions-->
+
+  <!-- 
+    Here we indicate the size of our space, the location of our robots
+    and static objects like boxes, cylinders, etc.
+  -->
+  <arena size="3,3,1" center="0,0,0.5">
+    <box id="wall_north" size="2,0.1,0.5" movable="false">
+      <body position="0,1,0" orientation="0,0,0" />
+    </box>
+    <box id="wall_south" size="2,0.1,0.5" movable="false">
+      <body position="0,-1,0" orientation="0,0,0" />
+    </box>
+    <box id="wall_east" size="0.1,2,0.5" movable="false">
+      <body position="1,0,0" orientation="0,0,0" />
+    </box>
+    <box id="wall_west" size="0.1,2,0.5" movable="false">
+      <body position="-1,0,0" orientation="0,0,0" />
+    </box>
+    <foot-bot id="fb0">
+      <body position="-0.5,0,0" orientation="0,0,0"/>
+      <controller config="lbc"/>
+      <!-- 
+        notice ^this references id of controller
+        defined in controllers section
+	  -->
+    </foot-bot>
+	<foot-bot id="fb1">
+      <body position="0.5,0,0" orientation="180,0,0"/>
+      <controller config="lbc"/>
+    </foot-bot>
+  </arena>
+
+  <!-- more settings for simulation; not super important -->
+  <physics_engines>
+    <dynamics2d id="dyn2d"/>
+  </physics_engines>
+
+  <!-- here we tell the simulator our communication medium/media -->
+  <media>
+	<range_and_bearing id="rab"/>
+  </media>
+
+  <!-- 
+	more settings for simulation;
+    we can turn these off for batch processing 
+  -->
+  <visualization>
+    <qt-opengl>
+      <camera>
+        <placements>
+          <placement index="0" position="0,0,8.14689" look_at="0,0,0" up="1,0,0" lens_focal_length="65" />
+        </placements>
+      </camera>
+    </qt-opengl>
+  </visualization>
+</argos-configuration>
