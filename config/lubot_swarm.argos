@@ -26,9 +26,9 @@
         <range_and_bearing implementation="medium" medium="rab"/>
       </sensors>
       <!-- 
-		add parameters in params to set initialization constants without
-		having to recompile
-	  -->
+		    add parameters in params to set initialization constants without
+		    having to recompile
+	     -->
       <params/> 
     </lubot_controller>
   </controllers>
@@ -42,30 +42,45 @@
   <!-- 
     Here we indicate the size of our space, the location of our robots
     and static objects like boxes, cylinders, etc.
+
+    Coordinates use the right-hand rule with your index finger pointing
+    forward (so you're pointing to positive x), your middle finger pointing
+    to the left (positive y), and your thumb is pointing up (positive z).
+    size, center, and position properties use this coordinate system.
+    Keep in mind that position is the center of gravity of the object, so
+    as the first argument to size increases, the object grows along the
+    positive and negative x axis.
+
+    I changed the names of the id properties from the diffusion example,
+    but decided on this based on the camera's position since it's more 
+    intuitive to start off facing north. We can change this later.
+
+    The orientation property uses angles in degrees rotated from the Z,Y,X
+    axes (in that order).
   -->
   <arena size="3,3,1" center="0,0,0.5">
-    <box id="wall_north" size="2,0.1,0.5" movable="false">
+    <box id="wall_west" size="2,0.1,0.5" movable="false">
       <body position="0,1,0" orientation="0,0,0" />
     </box>
     <box id="wall_south" size="2,0.1,0.5" movable="false">
       <body position="0,-1,0" orientation="0,0,0" />
     </box>
-    <box id="wall_east" size="0.1,2,0.5" movable="false">
+    <box id="wall_north" size="0.1,2,0.5" movable="false">
       <body position="1,0,0" orientation="0,0,0" />
     </box>
-    <box id="wall_west" size="0.1,2,0.5" movable="false">
+    <box id="wall_east" size="0.1,2,0.5" movable="false">
       <body position="-1,0,0" orientation="0,0,0" />
     </box>
     <foot-bot id="fb0">
-      <body position="-0.5,0,0" orientation="0,0,0"/>
+      <body position="0,0,0" orientation="0,0,0"/>
       <controller config="lbc"/>
       <!-- 
         notice ^this references id of controller
         defined in controllers section
 	  -->
     </foot-bot>
-	<foot-bot id="fb1">
-      <body position="0.5,0,0" orientation="180,0,0"/>
+    <foot-bot id="fb1">
+      <body position="0,0,0" orientation="0,0,0"/>
       <controller config="lbc"/>
     </foot-bot>
   </arena>
@@ -77,7 +92,7 @@
 
   <!-- here we tell the simulator our communication medium/media -->
   <media>
-	<range_and_bearing id="rab"/>
+	  <range_and_bearing id="rab"/>
   </media>
 
   <!-- 
@@ -88,7 +103,10 @@
     <qt-opengl>
       <camera>
         <placements>
-          <placement index="0" position="0,0,8.14689" look_at="0,0,0" up="1,0,0" lens_focal_length="65" />
+          <!-- up direction calculated, might be wrong/inaccurate -->
+          <placement index="0" position="-4,0,8" look_at="0,0,0" up="0.89443,0,0.44721" lens_focal_length="65" />
+          <!-- top view -->
+          <placement index="1" position="0,0,8.14689" look_at="0,0,0" up="1,0,0" lens_focal_length="65" />
         </placements>
       </camera>
     </qt-opengl>
