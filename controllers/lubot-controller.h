@@ -64,6 +64,7 @@ private:
 	CCI_FootBotProximitySensor      * m_pcProximity;
   CCI_RangeAndBearingActuator     * m_pcCommsTransmr;
   CCI_RangeAndBearingSensor       * m_pcCommsRecvr;
+  int                               m_nID;
 };
 
 

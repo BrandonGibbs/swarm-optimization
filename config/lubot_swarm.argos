@@ -59,28 +59,35 @@
     axes (in that order).
   -->
   <arena size="3,3,1" center="0,0,0.5">
-    <box id="wall_west" size="2,0.1,0.5" movable="false">
+    <box id="wall_west" size="2,0.1,0.3" movable="false">
       <body position="0,1,0" orientation="0,0,0" />
     </box>
-    <box id="wall_south" size="2,0.1,0.5" movable="false">
+    <box id="wall_south" size="2,0.1,0.3" movable="false">
       <body position="0,-1,0" orientation="0,0,0" />
     </box>
-    <box id="wall_north" size="0.1,2,0.5" movable="false">
+    <box id="wall_north" size="0.1,2,0.3" movable="false">
       <body position="1,0,0" orientation="0,0,0" />
     </box>
-    <box id="wall_east" size="0.1,2,0.5" movable="false">
+    <box id="wall_east" size="0.1,2,0.3" movable="false">
       <body position="-1,0,0" orientation="0,0,0" />
     </box>
-    <foot-bot id="fb0">
-      <body position="0,0,0" orientation="0,0,0"/>
+    <foot-bot id="fb0" rab_range="1">
+      <body position="-0.75,0.25,0" orientation="0,0,0"/>
       <controller config="lbc"/>
       <!-- 
         notice ^this references id of controller
         defined in controllers section
-	  -->
+      -->
     </foot-bot>
-    <foot-bot id="fb1">
-      <body position="0,0,0" orientation="0,0,0"/>
+    <box id="comms_barrier" size="0.25,0.25,0.25" movable="false">
+      <body position="-0.75,0,0" orientation="0,0,0"/>
+    </box>
+    <foot-bot id="fb1" rab_range="1">
+      <body position="-0.5,-0.5,0" orientation="45,0,0"/>
+      <controller config="lbc"/>
+    </foot-bot>
+	<foot-bot id="fb2" rab_range="1">
+      <body position="-0.25,0.75,0" orientation="0,0,0"/>
       <controller config="lbc"/>
     </foot-bot>
   </arena>
