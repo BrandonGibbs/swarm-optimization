@@ -1,12 +1,15 @@
 #include "lubot-controller.h"
 #include <iostream>
 #include <string>
+#include <cmath> // logarithm, INFINITY
 #include <argos3/core/utility/configuration/argos_configuration.h>
 #include <argos3/core/utility/datatypes/byte_array.h>
 
 CLubot::CLubot() :
 		m_pcWheels(NULL),
-		m_pcProximity(NULL) {}
+		m_pcProximity(NULL),
+		m_pcCommsTransmr(NULL),
+		m_pcCommsRecvr(NULL){}
 		
 void CLubot::Init(TConfigurationNode& t_node){
 
@@ -72,8 +75,25 @@ void CLubot::ControlStep(){
     * CCI_FootBotProximitySensor has a TReading, which is a vector<SReading>.
     * The SReading struct has a Value and Angle
     *
-	* The header file explains the readings better than I can:
-	* argos3/src/plugins/robots/foot-bot/control_interface/ci_footbot_proximity_sensor.h
+	* The footbot is 17 cm in diameter as described here:
+	* https://www.swarmanoid.org/swarmanoid_hardware.php.html
+	* (click on the tab that says "Foot-bots")
+	*
+	* and '$ argos3 -q proximity' says that this sensor returns readings 
+	* using exp(-d), so we can get the distance by doing the inverse:
+	* 	-ln(value)
+	*
+	* Using the pythagorean theorem and some high school physics, we can see
+	* that fb1 collides with the top-left corner at t=3.86s 
+	* (between t=38 and t=39 in the argos logs since it's running at 10 ticks
+	*  per second as defined in the .argos file).
+	*
+	* You'll notice that at t=38, the readings from sensors 0-5 
+	* (the front-left) and sensors 18-23 (front-right) are all showing a 
+	* reading (as they should), but at t>=39 sensors 2, 3, 20, and 21 
+	* incorrectly indicate that there's nothing in range. Ideally the robots
+	* shouldn't collide with surroundings, but it's something we should keep 
+	* in mind.
     */
     const CCI_FootBotProximitySensor::TReadings& 
       tProxReads = m_pcProximity->GetReadings();
@@ -82,7 +102,17 @@ void CLubot::ControlStep(){
 	for (CCI_FootBotProximitySensor::TReadings::const_iterator it = tProxReads.begin(); 
 	     it != tProxReads.end(); 
 		 ++it){
-		std::cout << "Prox: " << "Value: " << it->Value << " Angle: " << it->Angle << std::endl;
+		double distance = INFINITY; // nothing in range
+		if (it->Value == 1){
+			// object is touching the sensor
+			distance = 0;
+		} else if (it->Value > 0){
+			// the distance in centimeters to the object
+			distance = -log(it->Value);
+		} 
+		
+		std::cout << "Prox: Value: " << it->Value << " Angle: " << it->Angle << std::endl;
+		std::cout << "-log(Value) -> d: " << distance << std::endl;
 	}
   } else {
 	std::string s("I'm fb2!!");
@@ -94,7 +124,7 @@ void CLubot::ControlStep(){
 void CLubot::Reset(){
   /* setting the velocity of each wheel of Lubot 1 */
   if (m_nID == 1){
-    m_pcWheels->SetLinearVelocity(150, 150);
+    m_pcWheels->SetLinearVelocity(50, 50);
   }
   std::cout << "reset Lubot" << std::endl;
 }
