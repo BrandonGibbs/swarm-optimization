@@ -40,6 +40,7 @@
 #include <argos3/plugins/robots/generic/control_interface/ci_range_and_bearing_actuator.h>
 #include <argos3/plugins/robots/generic/control_interface/ci_range_and_bearing_sensor.h>
 #include <argos3/plugins/robots/foot-bot/control_interface/ci_footbot_proximity_sensor.h>
+#include <argos3/plugins/robots/generic/control_interface/ci_positioning_sensor.h>
 
 using namespace argos;
 
@@ -64,6 +65,7 @@ private:
   CCI_FootBotProximitySensor      * m_pcProximity;
   CCI_RangeAndBearingActuator     * m_pcCommsTransmr;
   CCI_RangeAndBearingSensor       * m_pcCommsRecvr;
+  CCI_PositioningSensor			  * m_pcPosSensor;
   int                               m_nID;
 };
 

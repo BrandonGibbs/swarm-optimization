@@ -9,7 +9,8 @@ CLubot::CLubot() :
 		m_pcWheels(NULL),
 		m_pcProximity(NULL),
 		m_pcCommsTransmr(NULL),
-		m_pcCommsRecvr(NULL){}
+		m_pcCommsRecvr(NULL),
+		m_pcPosSensor(NULL){}
 		
 void CLubot::Init(TConfigurationNode& t_node){
 
@@ -23,6 +24,7 @@ void CLubot::Init(TConfigurationNode& t_node){
   m_pcProximity = GetSensor<CCI_FootBotProximitySensor>("footbot_proximity");
   m_pcCommsTransmr = GetActuator<CCI_RangeAndBearingActuator>("range_and_bearing");
   m_pcCommsRecvr = GetSensor<CCI_RangeAndBearingSensor>("range_and_bearing");
+  m_pcPosSensor = GetSensor<CCI_PositioningSensor>("positioning");
 
   /* setting the velocity of each wheel of Lubot 1 */
   if (m_nID == 1){
@@ -32,7 +34,17 @@ void CLubot::Init(TConfigurationNode& t_node){
 }
 
 void CLubot::ControlStep(){
-  std::cout << "----------------" << std::endl;
+  /**
+   * Position and orientation fields are basically the same as the ones set in 
+   * the arena section of the .argos file: 
+   *   position = (x coordinate, y coordinate, z coordinate), 
+   *   orientation = rotation angle about given axis in degrees (z, y, x)
+   */
+  const CCI_PositioningSensor::SReading & sPosReading = m_pcPosSensor->GetReading();
+  std::cout << "---------------- fb" << m_nID << ": Position = " 
+			<< sPosReading.Position << ", Orientation = " 
+			<< sPosReading.Orientation << std::endl;
+			
   // designate lubot 0 to be a listener and lubots 1 and 2 to be transmitters
   if (m_nID == 0){
 	  
