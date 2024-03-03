@@ -30,7 +30,7 @@
 		    add parameters in params to set initialization constants without
 		    having to recompile
 	     -->
-      <params/> 
+      <params maxvelocity="50"/> 
     </lubot_controller>
   </controllers>
 

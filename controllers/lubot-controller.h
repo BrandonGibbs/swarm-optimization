@@ -67,6 +67,7 @@ private:
   CCI_RangeAndBearingSensor       * m_pcCommsRecvr;
   CCI_PositioningSensor			  * m_pcPosSensor;
   int                               m_nID;
+  double                            m_dMaxVelocity;
 };
 
 

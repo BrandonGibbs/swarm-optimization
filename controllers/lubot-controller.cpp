@@ -10,7 +10,8 @@ CLubot::CLubot() :
 		m_pcProximity(NULL),
 		m_pcCommsTransmr(NULL),
 		m_pcCommsRecvr(NULL),
-		m_pcPosSensor(NULL){}
+		m_pcPosSensor(NULL),
+		m_dMaxVelocity(50){}
 		
 void CLubot::Init(TConfigurationNode& t_node){
 
@@ -28,7 +29,8 @@ void CLubot::Init(TConfigurationNode& t_node){
 
   /* setting the velocity of each wheel of Lubot 1 */
   if (m_nID == 1){
-    m_pcWheels->SetLinearVelocity(50, 50);
+	GetNodeAttributeOrDefault(t_node, "maxvelocity", m_dMaxVelocity, m_dMaxVelocity);
+    m_pcWheels->SetLinearVelocity(m_dMaxVelocity, m_dMaxVelocity);
   }
   std::cout << "initialized Lubot " << m_nID << std::endl;
 }
@@ -136,7 +138,7 @@ void CLubot::ControlStep(){
 void CLubot::Reset(){
   /* setting the velocity of each wheel of Lubot 1 */
   if (m_nID == 1){
-    m_pcWheels->SetLinearVelocity(50, 50);
+    m_pcWheels->SetLinearVelocity(m_dMaxVelocity, m_dMaxVelocity);
   }
   std::cout << "reset Lubot" << std::endl;
 }
