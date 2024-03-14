@@ -1,0 +1,69 @@
+<?xml version="1.0" ?>
+<argos-configuration>
+
+  <framework>
+    <system threads="0"/>
+    <experiment length="0" ticks_per_second="10"/>
+  </framework>
+  
+  <controllers>
+	<pathfindbot id="pfb" library="build/controllers/libpathfindbot_controller.so">
+      <actuators>
+        <differential_steering implementation="default"/>
+        <range_and_bearing implementation="default"/>
+      </actuators>
+      <sensors>
+        <footbot_proximity implementation="default" show_rays="true"/>
+        <range_and_bearing implementation="medium" medium="rab"/>
+		<positioning implementation="default"/>
+      </sensors>
+	  
+	  <!-- specify the location of the target -->
+	  <params 
+	    maxvelocity="0.2"
+		maxrotationvelocity = "2.857142857142857"
+		target="3.8, 0.0"/>
+	</pathfindbot>
+  </controllers>
+
+  <arena size="8,8,1" center="0,0,0.5">
+	<foot-bot id="fb0">
+	  <body position="-3.8,0,0" orientation="0,0,0"/>
+	  <controller config="pfb"/>
+	</foot-bot>
+	
+	<!-- uniformly distributed cylinders -->
+	<!--distribute>
+      <position method="uniform" min="-3,-3,0" max="3,3,0" />
+      <orientation method="constant" values="0,0,0" />
+      <entity quantity="40" max_trials="100">
+        <cylinder id="c" height="0.5" radius="0.15" movable="false" />
+      </entity>
+    </distribute-->
+	
+	<!-- big flat barrier at the center -->
+	<!--box id="bigflat" size="0.1,7,0.5" movable="false">
+		<body position="0,0,0" orientation="0,0,0"/>
+	</box-->
+  </arena>
+  
+  <physics_engines>
+    <dynamics2d id="dyn2d"/>
+  </physics_engines>
+  
+  <media>
+    <range_and_bearing id="rab"/>
+  </media>
+  
+  <visualization>
+    <qt-opengl>
+      <camera>
+        <placements>
+          <placement index="0" position="-4,0,8" look_at="-0.5,0,0" up="0.91615733,0,0.40081883" lens_focal_length="32" />
+          <placement index="1" position="0,0,8.14689" look_at="0,0,0" up="1,0,0" lens_focal_length="27.5" />
+        </placements>
+      </camera>
+    </qt-opengl>
+  </visualization>
+  
+</argos-configuration>

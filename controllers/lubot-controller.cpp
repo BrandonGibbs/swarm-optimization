@@ -1,7 +1,7 @@
 #include "lubot-controller.h"
 #include <iostream>
 #include <string>
-#include <cmath> // logarithm, INFINITY
+#include <cmath> // INFINITY
 #include <argos3/core/utility/configuration/argos_configuration.h>
 #include <argos3/core/utility/datatypes/byte_array.h>
 
@@ -89,13 +89,15 @@ void CLubot::ControlStep(){
     * CCI_FootBotProximitySensor has a TReading, which is a vector<SReading>.
     * The SReading struct has a Value and Angle
     *
-	* The footbot is 17 cm in diameter as described here:
-	* https://www.swarmanoid.org/swarmanoid_hardware.php.html
-	* (click on the tab that says "Foot-bots")
+	* The footbot is 17 cm in diameter and the proximity sensor range is 10 cm.
+	* These values are defined here:
+	*   argos3/src/plugins/robots/foot-bot/simulator/footbot_entity.cpp
 	*
-	* and '$ argos3 -q proximity' says that this sensor returns readings 
-	* using exp(-d), so we can get the distance by doing the inverse:
-	* 	-ln(value)
+	* and the function for the proximity sensor readings is here 
+	* (Real CalculateReading):
+	*   argos3/src/plugins/robots/foot-bot/simulator/footbot_proximity_default_sensor.cpp
+	*
+	* so the distance is the inverse: d = 0.0100527 / value - 0.000163144
 	*
 	* Using the pythagorean theorem and some high school physics, we can see
 	* that fb1 collides with the top-left corner at t=3.86s 
@@ -113,20 +115,20 @@ void CLubot::ControlStep(){
       tProxReads = m_pcProximity->GetReadings();
 	
 	// used iterators here, but could have used subscript notation like in RAB sensor readings
-	for (CCI_FootBotProximitySensor::TReadings::const_iterator it = tProxReads.begin(); 
-	     it != tProxReads.end(); 
+	for (CCI_FootBotProximitySensor::TReadings::const_iterator it = tProxReads.begin();
+	     it != tProxReads.end();
 		 ++it){
 		double distance = INFINITY; // nothing in range
 		if (it->Value == 1){
 			// object is touching the sensor
 			distance = 0;
 		} else if (it->Value > 0){
-			// the distance in centimeters to the object
-			distance = -log(it->Value);
+			// the distance in meters to the object
+			distance = 0.0100527/it->Value - 0.000163144;
 		} 
 		
 		std::cout << "Prox: Value: " << it->Value << " Angle: " << it->Angle << std::endl;
-		std::cout << "-log(Value) -> d: " << distance << std::endl;
+		std::cout << "f^-1(v) -> d: " << distance << " m" << std::endl;
 	}
   } else {
 	std::string s("I'm fb2!!");
