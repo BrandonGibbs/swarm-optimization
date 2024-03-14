@@ -43,11 +43,37 @@ public:
 	//	BACKTRACKING
 	//};
 	
-
-	enum EMovementState {
-		STATIONARY = 0,
-		ROTATING,
-		MOVING_FORWARD
+	struct SMovementParams {
+		enum EMovementState {
+			STATIONARY = 0,
+			ROTATING,
+			MOVING_FORWARD
+		} m_eMovementState;
+		
+		/**
+		 * These will remain constant but I haven't figured out how to compile 
+		 * with const keyword
+		 */
+		double m_dMaxVelocity,
+		       m_dMaxRotnSpeed,
+		       m_dSimSecPerTick; // time delta for velocity calculations
+		
+		double m_dLeftWheelSpeed, 
+		       m_dRightWheelSpeed;
+			   
+		/**
+		 * the amount of time steps we'll be going the max linear or angular 
+		 * velocity
+		 */
+		int    m_nTimes;
+		/**
+		 * the remaining linear or angular displacement we need to travel to 
+		 * arrive at destination
+		 */
+		double m_dRemainDisp;
+		
+		
+		void Init (TConfigurationNode& t_node);
 	};
 
 private:
@@ -61,34 +87,30 @@ private:
 	CCI_PositioningSensor           * m_pcPosSensor;
 
 	/**
-	 * these values are set in the configuration/constructor/Init and remain
-	 * constant until the program ends
+	 * This is the global target which if the robot reaches, the simulation 
+	 * terminates
 	 */
-	CVector2                          m_cTarget;
-	double                            m_dMaxVelocity;
-	double                            m_dMaxRotnSpeed;
-	double                            m_dSimSecPerTick; // time delta for velocity calculations
+	CVector2 m_cTarget;
 	
 	/**
-	 * these will determine how to move
+	 * An instance of the struct defined above. An explanation of how the state
+	 * machine works is in ControlStep.
 	 */
-	EMovementState                    m_eMovementState;
-	double                            m_dLeftWheelSpeed, m_dRightWheelSpeed;
-	int                               m_nTimes; // the amount of time steps we'll be going the max linear or angular velocity
-	double                            m_dRemainDisp; // the remaining linear or angular displacement we need to travel to arrive at destination
+	SMovementParams m_sMovement;
 	
 	/**
 	 * the robot needs to provide the previous position to the grid so that it
-	 * can know where it came from and the grid will return the local target
+	 * can know where it came from and the grid will return the next local 
+	 * target
 	 */
-	CVector2                          m_cPrevPos;
-	CVector2                          m_cLocalTarget;
+	CVector2 m_cPrevPos;
+	CVector2 m_cLocalTarget;
 	
 	/**
 	 * the grid will store the states the robot has traversed and will also
 	 * tell it which state to explore next
 	 */
-	Grid                              m_cGrid;
+	Grid m_cGrid;
 };
 
 

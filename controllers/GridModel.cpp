@@ -1,13 +1,21 @@
 #include "GridModel.h"
 
-#include <cmath> // div, fabs, sqrt, INFINITY
-#include <string>
+#include <cmath>  // div, fabs, sqrt, INFINITY
+#include <string> // used when overloading the '<<' operator for Node
+#include <array>  // use when printing the grid: the left-most, right-most, and lowest values are stored here
 
 #define GRID_START_WIDTH 64
 #define GRID_START_AREA (GRID_START_WIDTH * GRID_START_WIDTH)
 #define STATE_SIZE 0.17
 #define IND_FACTOR 5.88235294117647 // 1/0.17 for mapping meters to grid units
 
+/**
+ * The heuristics functions determine the priority with which we will explore
+ * states in the frontier (states not currently in the grid we may need to 
+ * explore and are neighbors of the outermost states we've explored).
+ *
+ * The lower the priority, the sooner the value will get popped from the queue.
+ */
 double manhattanHeuristic(CVector2 pos, CVector2 targetPos){
 	double cX = pos.GetX(),
 	       cY = pos.GetY(),
@@ -29,6 +37,8 @@ double euclideanHeuristic(CVector2 pos, CVector2 targetPos){
 	return sqrt(diffX * diffX  +  diffY * diffY);
 }
 
+
+
 std::ostream & operator<<(std::ostream &os, Node n){
 	std::string parent   = (n.parent == NULL)? "NULL":"a node",
 	            explored = (n.explored)? "true":"false";
@@ -37,76 +47,12 @@ std::ostream & operator<<(std::ostream &os, Node n){
 	return os;
 }
 
+
+
 Grid::Grid():
 	stateSpace(GRID_START_AREA, {NULL, false, INFINITY}),
 	nodesExplored(0){}
-
-/**
- * The robot will need to keep the previous time step's positioning sensor 
- * reading. This will be the parent position when transitioning states.
- *
- * Return whether there was a state transition. This will be false at most time
- * steps.
- */
-CVector2 Grid::insert(CVector2 pos, CVector2 parentPos, double cost){
-	Node * parentNode;
 	
-	if (nodesExplored == 0){
-		// then this is the root node
-		startPos = pos;
-		parentNode = NULL;
-		cost = 0;
-	} else {
-		parentNode = &(*this)[parentPos];
-	}
-	
-	/**
-	 * This has to be declared here since startPos needs to be set so that 
-	 * indexing will be correct and to avoid getting just a copy of the value 
-	 * in stateSpace instead of getting a reference.
-	 */
-	Node & currentNode = (*this)[pos];
-	
-	if (!currentNode.explored){
-		currentNode = {
-			parentNode,
-			true,
-			((parentNode != NULL)? parentNode->cost : 0) + cost
-		};
-		//std::cout << "insert: " << currentNode << std::endl;
-		nodesExplored += 1;
-		
-		std::vector <CVector2> neighbors = getNeighborMidPoints(pos);
-		
-		/**
-		 * Instead of pushing every neighbor, we need to take into account the
-		 * kind of state transition which has happened. If it's down, push 
-		 * bottom 3 states. If it's down-left, push left, bottom, and 
-		 * bottom-left states, etc.
-		 *
-		 * This is to avoid pushing duplicate states.
-		 */
-		for (std::vector <CVector2>::iterator iter = neighbors.begin();
-		     iter != neighbors.end();
-			 ++iter){
-			float priority = cost + manhattanHeuristic(*iter, targetPos);
-			frontierStates.push(*iter, priority);
-		}
-		//frontierStates.printHeap();
-		return frontierStates.pop();
-	}
-	//std::cout << "The thing that wasn\'t supposed to happen happened. ;-;" << std::endl;
-	return CVector2(0, 0); // this shouldn't ever happen
-}
-
-bool Grid::contains(CVector2 pos){
-	return (*this)[pos].explored;
-}
-
-void Grid::setTarget(CVector2 pos){
-	targetPos = pos;
-}
-
 int Grid::index(CVector2 pos){
 	// first, notice that we're swapping x and y axes
 	/**
@@ -142,6 +88,71 @@ Node & Grid::operator[](CVector2 pos){
 }
 
 /**
+ * The robot will need to keep the previous time step's positioning sensor 
+ * reading. This will be the parent position when transitioning states.
+ *
+ * Return whether there was a state transition. This will be false at most time
+ * steps.
+ */
+CVector2 Grid::insert(CVector2 pos, CVector2 parentPos, double cost){
+	Node * parentNode;
+	CVector2 nextState; // the value from the queue we will return
+	
+	if (nodesExplored == 0){
+		// then this is the root node
+		startPos = pos;
+		parentNode = NULL;
+		cost = 0;
+	} else {
+		parentNode = &(*this)[parentPos];
+	}
+	
+	/**
+	 * This has to be declared here since 
+	 *   - the startPos needs to be set beforehand so that indexing will be 
+	 *     correct
+	 *   - we want a reference to the value in stateSpace, not a copy
+	 */
+	Node & currentNode = (*this)[pos];
+	
+	if (!currentNode.explored){
+		currentNode = {
+			parentNode,
+			true,
+			((parentNode != NULL)? parentNode->cost : 0) + cost
+		};
+		std::cout << "insert: " << currentNode << std::endl;
+		nodesExplored += 1;
+		
+		std::vector <CVector2> neighbors = getNeighborMidPoints(pos);
+
+		for (std::vector <CVector2>::iterator iter = neighbors.begin();
+		     iter != neighbors.end();
+			 ++iter){
+			float priority = cost + manhattanHeuristic(*iter, targetPos);
+			frontierStates.push(*iter, priority);
+		}
+		//frontierStates.printHeap();
+		do {
+			nextState = frontierStates.pop();
+			std::cout << "popped from PQ: " << nextState << std::endl;
+		} while (!frontierStates.empty() && contains(nextState));
+		
+		return nextState;
+	}
+	//std::cout << "The thing that wasn\'t supposed to happen happened. ;-;" << std::endl;
+	return CVector2(0, 0); // this shouldn't ever happen
+}
+
+bool Grid::contains(CVector2 pos){
+	return (*this)[pos].explored;
+}
+
+void Grid::setTarget(CVector2 pos){
+	targetPos = pos;
+}
+
+/**
  * This is the inverse of index(vector), except that we can only return an 
  * approximation: the middle point of the state
  */
@@ -171,9 +182,7 @@ CVector2 Grid::getStateMidPoint(CVector2 pos){
 }
 
 /**
- * Return an array of at most 8 points in the middle of states neighboring the 
- * current state (even if there is no path to those states, e.g. barriers)
- * which aren't in the grid.
+ * Return an array of at most 8 neighbor states which aren't in the grid.
  *
  *    -------------------
  *    |  n  |  n  |  n  |
@@ -199,3 +208,10 @@ CVector2 Grid::getStateMidPoint(CVector2 pos){
 	
 	 return vecs;
  }
+ 
+ /*
+ void Grid::printGrid (){
+	 
+	 
+ }
+ */

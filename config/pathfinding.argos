@@ -19,10 +19,13 @@
       </sensors>
 	  
 	  <!-- specify the location of the target -->
-	  <params 
-	    maxvelocity="0.2"
-		maxrotationvelocity = "2.857142857142857"
-		target="3.8, 0.0"/>
+	  <params target="3.8, 0.0">
+        <!-- The max velocity in m/s and max rotation velocity in rad/s -->
+		<movementparams 
+			maxvelocity="0.2"
+			maxrotationvelocity="2.857142857142857"
+		/>
+		</params>
 	</pathfindbot>
   </controllers>
 

@@ -53,6 +53,7 @@
 
 #include <iostream>
 #include <vector>
+//#include <unordered_map>
 #include <argos3/core/utility/math/vector2.h>
 
 #include "PQueue.h"
@@ -63,8 +64,6 @@ struct Node {
 	Node * parent;
 	bool   explored;
 	double cost;
-	
-	std::ostream & operator<<(std::ostream &os);
 };
 
 class Grid {
@@ -93,7 +92,7 @@ public:
 	CVector2 getStateMidPoint (CVector2 pos);
 	
 	/**
-	 *	
+	 * Get neighbor states
 	 */
 	std::vector<CVector2> getNeighborMidPoints (CVector2 pos);
 	
@@ -107,8 +106,12 @@ private:
 	 */
 	CVector2 getStateMidPoint (Node * pNode);
 	
-	std::vector <Node>   stateSpace;
-	PQueue      <CVector2> frontierStates;
+	
+	
+	
+	std::vector        <Node>     stateSpace;
+	PQueue             <CVector2> frontierStates;
+	//std::unordered_map <CVector2> closedSet;
 	
 	CVector2 startPos, targetPos;
 	int nodesExplored;
