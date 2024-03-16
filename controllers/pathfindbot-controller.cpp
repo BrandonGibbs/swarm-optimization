@@ -1,6 +1,7 @@
 #include "pathfindbot-controller.h"
 
 #include <cmath> /* INFINITY, fmod */
+#include <vector> /* vector<CRange<CRadians>> are used in GetAvailablePaths */
 #include <argos3/core/simulator/simulator.h> /* CSimulator::Terminate, CSimulator::GetInstance */
 #include <argos3/core/simulator/physics_engine/physics_engine.h>  /* CPhysicsEngine::GetSimulationClockTick */
 #include <argos3/core/utility/logging/argos_log.h> /* LOG */
@@ -24,7 +25,7 @@ CPathFindBot::CPathFindBot() :
 	{}
 	
 void CPathFindBot::SMovementParams::Init(TConfigurationNode& t_node){
-	m_eMovementState = STATIONARY;
+	m_eState = STATIONARY;
 	m_dMaxVelocity   = 0.2;               // 0.2 m/s
 	m_dMaxRotnSpeed  = 2.857142857142857; // rad/s - both wheels rotating in opposite directions at 20 cm/s (163.7 degrees/s)
 	
@@ -45,27 +46,43 @@ void CPathFindBot::Init(TConfigurationNode& t_node){
 	GetNodeAttributeOrDefault(t_node, "target", m_cTarget, m_cTarget);
 	m_sMovement.Init(GetNode(t_node, "movementparams"));
 	m_cGrid.setTarget(m_cTarget);
-	
 }
 
 /**
  * Get a set of angle ranges where the robot will be able to travel.
+ *
+ * First we'll use the KISS method and disregard distances. If there's any 
+ * reading, we'll treat it as a range where there's no path available.
+ *
+ * The sensor angles start at 7.5 degrees and the subsequent sensors are 
+ * 15 degrees apart. In the constructor it says that angles are 
+ * 'SignedNormalize'd, so they're in the range [-pi,pi].
+ * Source: 
+ *   argos3/src/plugins/robots/foot-bot/control_interface/ci_footbot_proximity_sensor.cpp
+ *
+ * We'll get the index to the relevant sensors by truncating the angle to the
+ * target to an integer in this list and check to see if there are readings in 
+ * in that range.
  */
-//CRadians CPathFindBot::GetAvailablePaths(
-//  const CCI_FootBotProximitySensor::TReadings tProxReads
-//){
-	/*
-	for (CCI_FootBotProximitySensor::TReadings::const_iterator it = tProxReads.begin();
-	     it != tProxReads.end();
-		 ++it){
-		double distance = INFINITY;
-		if (it->Value == 1){
-			distance = 0;
-		} else if (it->Value > 0){
-			distance = 0.0100527 / it->Value - 0.000163144;
-		}
-	}*/
-//}
+bool isPathReachable(
+	const CCI_FootBotProximitySensor::TReadings tProxReads, 
+	CRadians angleToTarget
+){
+	LOG << "angle to target: " << angleToTarget;
+	angleToTarget.SignedNormalize();
+	LOG << " -> " << angleToTarget;
+	int angleInd = (int) angleToTarget.GetValue() / (CRadians::PI_OVER_SIX.GetValue()/4);
+	double sumReads = 0;
+	LOG << "-> angle index: " << angleInd << " ->";
+	
+	for (int i = angleInd - 1; i < angleInd + 3; i++){
+		int nonNegInd = (i < 0)? 24 + i : i;
+		LOG << " " << nonNegInd;
+		sumReads += tProxReads[nonNegInd].Value;
+	}
+	LOG << " -> sum: " << sumReads << std::endl;
+	return sumReads == 0;
+}
 
 void CPathFindBot::ControlStep(){
 
@@ -88,8 +105,8 @@ void CPathFindBot::ControlStep(){
 	 */
 	CRadians angleAboutZ, y, x; // we only care about the angle about z
 	orientation.ToEulerAngles(  // but this method requires y and x
-		angleAboutZ,  // now our angles are in range [0, pi) radians
-		y,            // or [0, 180) degrees
+		angleAboutZ,  // now our angles are in range [-pi, pi) radians
+		y,            // or [-180, 180) degrees
 		x             // instead of [0, 1)
 	);
 	
@@ -106,7 +123,7 @@ void CPathFindBot::ControlStep(){
 	 *     ------------------------------------------------------------------
 	 *     STATIONARY     | ROTATING       | when angle delta > 2 degrees
 	 *     ------------------------------------------------------------------
-	 *     STATIONARY     | MOVING_FORWARD | when distance delta > 10 cm
+	 *     STATIONARY     | MOVING_FORWARD | when distance delta > 8 cm
 	 *     ------------------------------------------------------------------
 	 *     ROTATING       | STATIONARY     | when (m_nTimes * max velocity) 
 	 *                    |                | distance has been travelled (as 
@@ -130,14 +147,16 @@ void CPathFindBot::ControlStep(){
 	 * that bridge when we get to it.
 	 */
 	LOG << "Current State: ";
-	switch (m_sMovement.m_eMovementState){
+	switch (m_sMovement.m_eState){
 		case m_sMovement.STATIONARY: {
-			LOG << "STATIONARY" << std::endl;
 			// then we're deciding what to do
+			LOG << "STATIONARY" << std::endl;
 			m_sMovement.m_dLeftWheelSpeed = 0;
 			m_sMovement.m_dRightWheelSpeed = 0;
 			
 			if (!m_cGrid.contains(currentPos)){
+				// if transitioned grid states, insert new grid state into grid
+				// and pop new target from PQ
 				m_cLocalTarget = 
 					m_cGrid.insert(currentPos, m_cPrevPos, 1); // cost will probably 
 															   // be time or distance
@@ -145,11 +164,28 @@ void CPathFindBot::ControlStep(){
 					<< m_cLocalTarget << std::endl;
 			}
 			
-			CVector2 vecToTarget (m_cLocalTarget - currentPos);
+			bool verified = false;
+			CVector2 vecToTarget;
+			CRadians diffVecAngle; // this is the angle which determines which 
+			                       // direction we will rotate depending on the
+			                       // sign
 			
-			// this is the angle which determines which direction we will 
-			// rotate depending on the sign
-			CRadians diffVecAngle (-(angleAboutZ - vecToTarget.Angle()));
+			do {
+				if (verified){
+					LOG << "discarded local target: " << m_cLocalTarget << std::endl;
+					// forget last target popped from PQ, get another
+					m_cLocalTarget = 
+						m_cGrid.getNextState();
+					LOG << "new local target: " << m_cLocalTarget << std::endl;
+				}
+				
+				vecToTarget = m_cLocalTarget - currentPos;
+				diffVecAngle = angleAboutZ - vecToTarget.Angle();
+			
+				verified = true;
+				
+				// check prox sensors to see if we can get to m_cLocalTarget
+			} while (!isPathReachable(tProxSensReads, diffVecAngle));
 			
 			m_sMovement.m_nTimes      = (int)(diffVecAngle.GetValue() / m_sMovement.m_dMaxRotnSpeed);
 			m_sMovement.m_dRemainDisp = fmod (diffVecAngle.GetValue(),  m_sMovement.m_dMaxRotnSpeed);
@@ -162,41 +198,41 @@ void CPathFindBot::ControlStep(){
 				if (m_sMovement.m_nTimes == 0 && Abs(m_sMovement.m_dRemainDisp) < 0.08){
 					LOG << "Arrived at local target?" << std::endl;
 				} else {
-					m_sMovement.m_eMovementState = m_sMovement.MOVING_FORWARD;
+					m_sMovement.m_eState = m_sMovement.MOVING_FORWARD;
 				}
 			} else {
-				m_sMovement.m_eMovementState = m_sMovement.ROTATING;
+				m_sMovement.m_eState = m_sMovement.ROTATING;
 			}
 			break;
 		} case m_sMovement.ROTATING: {
 			LOG << "ROTATING" << std::endl;
 			if (m_sMovement.m_nTimes != 0){
 				// then the velocity will be the max for this time step
-				double wheelVelDiff = m_sMovement.m_dMaxRotnSpeed / FOOTBOT_INTERWHEEL_DIST;
+				// I just rearranged this equation which is used below to calculate
+				// angular velocity:
+				// angVel = (m_dRightWheelSpeed - m_dLeftWheelSpeed) / FOOTBOT_INTERWHEEL_DIST
+				double wheelVelDiff = m_sMovement.m_dMaxRotnSpeed * FOOTBOT_INTERWHEEL_DIST;
 				double wheelVelocity = wheelVelDiff / 2;
 				if (m_sMovement.m_nTimes > 0){
-					m_sMovement.m_dLeftWheelSpeed  = -wheelVelocity;
-					m_sMovement.m_dRightWheelSpeed =  wheelVelocity;
-					m_sMovement.m_nTimes -= 1;
-				} else if (m_sMovement.m_nTimes < 0){
 					m_sMovement.m_dLeftWheelSpeed  =  wheelVelocity;
 					m_sMovement.m_dRightWheelSpeed = -wheelVelocity;
+					m_sMovement.m_nTimes -= 1;
+				} else if (m_sMovement.m_nTimes < 0){
+					m_sMovement.m_dLeftWheelSpeed  = -wheelVelocity;
+					m_sMovement.m_dRightWheelSpeed =  wheelVelocity;
 					m_sMovement.m_nTimes += 1;
 				}
 			} else {
 				// the velocity needs to be less than the max, so calculate the
 				// velocity needed for the last time step before changing 
 				// states
-				// I just rearranged this equation which is used below to calculate
-				// angular velocity:
-				// angVel = (m_dRightWheelSpeed - m_dLeftWheelSpeed) / FOOTBOT_INTERWHEEL_DIST
 				double angVel = m_sMovement.m_dRemainDisp / m_sMovement.m_dSimSecPerTick;
 				double wheelVelDiff = angVel * FOOTBOT_INTERWHEEL_DIST;
 				double wheelVelocity = wheelVelDiff / 2;
-				m_sMovement.m_dLeftWheelSpeed  = -wheelVelocity;
-				m_sMovement.m_dRightWheelSpeed =  wheelVelocity;
+				m_sMovement.m_dLeftWheelSpeed  =  wheelVelocity;
+				m_sMovement.m_dRightWheelSpeed = -wheelVelocity;
 				
-				m_sMovement.m_eMovementState = m_sMovement.STATIONARY;
+				m_sMovement.m_eState = m_sMovement.STATIONARY;
 			}
 			break;
 		} case m_sMovement.MOVING_FORWARD: {
@@ -210,7 +246,7 @@ void CPathFindBot::ControlStep(){
 				// displacement/distance before changing states
 				double velocity = m_sMovement.m_dRemainDisp;// / m_dSimSecPerTick;
 				m_sMovement.m_dRightWheelSpeed = m_sMovement.m_dLeftWheelSpeed = velocity;
-				m_sMovement.m_eMovementState = m_sMovement.STATIONARY;
+				m_sMovement.m_eState = m_sMovement.STATIONARY;
 			}
 			break;
 		}

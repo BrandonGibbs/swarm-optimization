@@ -48,7 +48,7 @@ public:
 			STATIONARY = 0,
 			ROTATING,
 			MOVING_FORWARD
-		} m_eMovementState;
+		} m_eState;
 		
 		/**
 		 * These will remain constant but I haven't figured out how to compile 

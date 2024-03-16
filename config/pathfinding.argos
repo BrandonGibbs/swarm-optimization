@@ -30,19 +30,32 @@
   </controllers>
 
   <arena size="8,8,1" center="0,0,0.5">
+	<box id="northWall" size="0.1,7.9,0.5" movable="false">
+		<body position="4,0,0" orientation="0,0,0"/>
+	</box>
+	<box id="eastWall" size="7.9,0.1,0.5" movable="false">
+		<body position="0,-4,0" orientation="0,0,0"/>
+	</box>
+	<box id="westWall" size="7.9,0.1,0.5" movable="false">
+		<body position="0,4,0" orientation="0,0,0"/>
+	</box>
+	<box id="southWall" size="0.1,7.9,0.5" movable="false">
+		<body position="-4,0,0" orientation="0,0,0"/>
+	</box>
+  
 	<foot-bot id="fb0">
 	  <body position="-3.8,0,0" orientation="0,0,0"/>
 	  <controller config="pfb"/>
 	</foot-bot>
 	
 	<!-- uniformly distributed cylinders -->
-	<!--distribute>
+	<distribute>
       <position method="uniform" min="-3,-3,0" max="3,3,0" />
       <orientation method="constant" values="0,0,0" />
       <entity quantity="40" max_trials="100">
         <cylinder id="c" height="0.5" radius="0.15" movable="false" />
       </entity>
-    </distribute-->
+    </distribute>
 	
 	<!-- big flat barrier at the center -->
 	<!--box id="bigflat" size="0.1,7,0.5" movable="false">

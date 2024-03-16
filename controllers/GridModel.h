@@ -71,6 +71,9 @@ public:
 	Grid();
 	
 	/**
+	 * Insert the current position and its parent to remember path. Return the 
+	 * item with the lowest priority from the priority queue.
+	 *
 	 * The robot will need to keep the previous time step's positioning sensor 
 	 * reading. This will be the parent position when transitioning states.
 	 */
@@ -84,6 +87,14 @@ public:
 	 * have access to the target in the robot constructor
 	 */
 	void setTarget (CVector2 pos);
+	
+	/**
+	 * Return the next item from the priority queue.
+	 *
+	 * This will be called when there's no path to the state popped previously,
+	 * like if there's a barrier.
+	 */
+	CVector2 getNextState();
 	
 	/**
 	 * Overloaded getStateMidPoint since Node shouldn't be accessed outside of

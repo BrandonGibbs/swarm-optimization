@@ -91,8 +91,7 @@ Node & Grid::operator[](CVector2 pos){
  * The robot will need to keep the previous time step's positioning sensor 
  * reading. This will be the parent position when transitioning states.
  *
- * Return whether there was a state transition. This will be false at most time
- * steps.
+ * Return the next target state.
  */
 CVector2 Grid::insert(CVector2 pos, CVector2 parentPos, double cost){
 	Node * parentNode;
@@ -129,7 +128,7 @@ CVector2 Grid::insert(CVector2 pos, CVector2 parentPos, double cost){
 		for (std::vector <CVector2>::iterator iter = neighbors.begin();
 		     iter != neighbors.end();
 			 ++iter){
-			float priority = cost + manhattanHeuristic(*iter, targetPos);
+			float priority = cost + euclideanHeuristic(*iter, targetPos);
 			frontierStates.push(*iter, priority);
 		}
 		//frontierStates.printHeap();
@@ -150,6 +149,16 @@ bool Grid::contains(CVector2 pos){
 
 void Grid::setTarget(CVector2 pos){
 	targetPos = pos;
+}
+
+CVector2 Grid::getNextState(){
+	CVector2 nextState;
+	do {
+		nextState = frontierStates.pop();
+		std::cout << "popped from PQ: " << nextState << std::endl;
+	} while (!frontierStates.empty() && contains(nextState));
+	
+	return nextState;
 }
 
 /**
