@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.8.0)
 project(swarm_optimization)
 
-set(CMAKE_BUILD_TYPE "Release") # we'll need to add debug build eventually
+set(CMAKE_BUILD_TYPE "Release")
 
 #set(CMAKE_CXX_STANDARD 17)
 #set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -14,3 +14,4 @@ link_directories(${ARGOS_LIBRARY_DIR})
 link_libraries(${ARGOS_LDFLAGS})
 
 add_subdirectory(controllers)
+add_subdirectory(loop_functions)

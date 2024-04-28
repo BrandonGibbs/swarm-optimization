@@ -1,0 +1,146 @@
+<?xml version="1.0" ?>
+<argos-configuration>
+
+  <!-- ************************* -->
+  <!-- * General configuration * -->
+  <!-- ************************* -->
+  <framework>
+    <system threads="0" />
+    <experiment length="0"
+                ticks_per_second="10"
+                random_seed="124" />
+  </framework>
+
+  <!-- *************** -->
+  <!-- * Controllers * -->
+  <!-- *************** -->
+  <controllers>
+
+    <pathfindbot id="ffc"
+                                 library="build/controllers/libpathfindbot_controller.so">
+      <actuators>
+        <differential_steering implementation="default" />
+        <leds                  implementation="default" medium="leds" />
+	<range_and_bearing implementation="default" />
+      </actuators>
+      <sensors>
+       <!-- <footbot_light                       implementation="rot_z_only" show_rays="true" /> -->
+        <colored_blob_omnidirectional_camera implementation="rot_z_only" medium="leds" show_rays="true" />
+        <positioning implementation="default"/>	
+        <footbot_proximity implementation="default" show_rays="true" />
+	<range_and_bearing implementation="medium" medium="rab" />
+      </sensors>
+      
+      <params>
+		  
+        <wheel_turning hard_turn_angle_threshold="90"
+                       soft_turn_angle_threshold="70"
+                       no_turn_angle_threshold="10"
+                       max_speed="10"
+                       alpha="7.5" 
+                       delta="0.1" 
+                       velocity="5"
+                        />
+                       
+        <flocking target_distance="75"
+                  gain="1000"
+                  exponent="2" />
+        
+      </params>
+      
+    </pathfindbot>
+
+  </controllers>
+
+  <!-- ****************** -->
+  <!-- * Loop functions * -->
+  <!-- ****************** -->
+  <loop_functions library="build/loop_functions/libflocking_loop_functions"
+                  label="flocking_loop_functions">
+  </loop_functions>
+  <!-- *********************** -->
+  <!-- * Arena configuration * -->
+  <!-- *********************** -->
+  <arena size="30,30,1" center="0,0,0.5">
+
+   <!-- <light id="light"
+           position="8.9,2.7,0.5"
+           orientation="0,0,0"
+           color="yellow"
+           intensity="3.0"
+           medium="leds" />   -->
+    
+    <cylinder id="c0" height="0.5" radius="0.15" movable="false">
+    <body orientation="1,2,0" position="9,3,0"/>
+    </cylinder>
+    
+    <cylinder id="c1" height="0.5" radius="0.15" movable="false">
+    <body orientation="1,2,0" position="0,0,0"/>
+    </cylinder>
+    
+    <cylinder id="c2" height="0.5" radius="0.15" movable="false">
+    <body orientation="1,2,0" position="1,0,0"/>
+    </cylinder>
+    
+    <cylinder id="c3" height="0.5" radius="0.15" movable="false">
+    <body orientation="1,2,0" position="0,2,0"/>
+    </cylinder>
+    
+     
+    <!--
+        You can distribute entities randomly. Here, we distribute
+        the entities in this way:
+        - the position is uniformly distributed on the ground, in the
+          square whose corners are (4,4) and (5,5)
+        - the orientations are non-zero only when rotating around Z and
+          chosen from a gaussian distribution, whose mean is zero degrees
+          and standard deviation is 360 degrees.
+    -->
+
+    <box id="box1" movable="false" size="5,0.05,0.5">
+      <body orientation="50,2,0" position="8,4,0"/>
+    </box>  -->
+   
+   
+    <distribute>
+      <position method="uniform" min="4,4,0" max="5,5,0" />
+      <orientation method="gaussian" mean="0,0,0" std_dev="360,0,0" />
+      <entity quantity="6" max_trials="100">
+	<foot-bot id="fb" omnidirectional_camera_aperture="80" rab_range="2">
+          <controller config="ffc" />
+        </foot-bot>
+      </entity>
+    </distribute>
+
+  </arena>
+
+  <!-- ******************* -->
+  <!-- * Physics engines * -->
+  <!-- ******************* -->
+  <physics_engines>
+    <dynamics2d id="dyn2d" />
+  </physics_engines>
+
+  <!-- ********* -->
+  <!-- * Media * -->
+  <!-- ********* -->
+  <media>
+    <led id="leds" />
+    <range_and_bearing id="rab" />
+  </media>
+
+  <!-- ****************** -->
+  <!-- * Visualization * -->
+  <!-- ****************** -->
+  <visualization>
+    <qt-opengl>
+      <camera>
+        <placements>
+          <placement index="0" position="3.47447,8.20587,3.42167" look_at="3.94263,7.5512,2.82817" up="0.345221,-0.48276,0.804839" lens_focal_length="20" />
+        </placements>
+      </camera>
+      <user_functions label="flocking_qt_user_functions" />
+    </qt-opengl>
+  </visualization>
+
+</argos-configuration>
