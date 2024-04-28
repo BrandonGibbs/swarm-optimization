@@ -3,6 +3,7 @@
 #include <cmath> /* INFINITY */
 #include <cstring> /* memcpy */
 #include <argos3/core/simulator/simulator.h> /* CSimulator::GetInstance */
+#include <argos3/core/simulator/space/space.h> /* CSpace */
 #include <argos3/core/utility/logging/argos_log.h> /* LOG */
 
 #define AVG_WEIGHT      0.01 // used to calculate weighted average; must be in range [0, 1)
@@ -123,6 +124,9 @@ void CPathFindBot::ControlStep(){
 			LOG << controllerID << ": red -> blue (local minima detected)" << std::endl
 			    << "weighted average velocity toward target: " << m_dWeightAvgSpeedTarget << std::endl;
 		}
+		if(m_sFlockingParams.TargetDistance > MIN_TARGET_DIST){
+			m_sFlockingParams.TargetDistance -= SPREAD_RATE;
+		}
 	}
 	
 	/* Get readings from proximity sensor */
@@ -210,6 +214,7 @@ CVector2 CPathFindBot::FlockingVector() {
 	size_t unBlobsSeen = 0;
 	bool redBlobSeen    = false,
 	     blueBlobSeen   = false,
+	     orangeBlobSeen = false,
 	     yellowBlobSeen = false,
 	     greenBlobSeen  = false;
 
@@ -219,7 +224,7 @@ CVector2 CPathFindBot::FlockingVector() {
 	it != sCameraReadings.BlobList.end(); ++it){
 		
 		if ((*it)->Distance < 1.8 * m_sFlockingParams.TargetDistance){
-			if (m_cLEDColor == CColor::BLUE && (*it)->Color == CColor::YELLOW){
+			if ((m_cLEDColor == CColor::BLUE || m_cLEDColor == CColor::YELLOW) && (*it)->Color == CColor::ORANGE){
 				// if we see yellow, we need to get that robot's id so we can determine our own TargetDistance
 				m_nNeighborToFollow = getLOSNeighborID ((*it)->Distance, (*it)->Angle);
 				if (m_bFollowingNeighbor){
@@ -232,6 +237,7 @@ CVector2 CPathFindBot::FlockingVector() {
 
 			redBlobSeen    |= (*it)->Color == CColor::RED;
 			blueBlobSeen   |= (*it)->Color == CColor::BLUE;
+			orangeBlobSeen |= (*it)->Color == CColor::ORANGE;
 			yellowBlobSeen |= (*it)->Color == CColor::YELLOW;
 			greenBlobSeen  |= (*it)->Color == CColor::GREEN;
 		}
@@ -244,16 +250,20 @@ CVector2 CPathFindBot::FlockingVector() {
 			LOG << controllerID << ": red -> blue (see blue neighbor)" << std::endl;
 		}
 	} else if (m_cLEDColor == CColor::BLUE){
-		if (!yellowBlobSeen && !m_bNeighborLeftSwarm && m_sFlockingParams.TargetDistance < MAX_TARGET_DIST){
-			// spread out to find escape from local minima
-			m_sFlockingParams.TargetDistance += SPREAD_RATE;
-		} else {
-			// stop expanding because 
-			//   - we either lost a neighbor with no other neighbors, 
-			//   - have reached the max communication range, 
-			//   - or one of these conditions applies to our neighbors
+		
+		// spread out to find an escape from local minima
+		m_sFlockingParams.TargetDistance += SPREAD_RATE;
+		if (m_bNeighborLeftSwarm){
+			// let neighbors know one of our neighbors left the flock
+			m_sFlockingParams.TargetDistance = MAX_TARGET_DIST - 10;
+			m_bFollowingNeighbor = false;
+			m_cLEDColor = CColor::ORANGE;
+			LOG << controllerID << ": blue -> orange (neighbor left flock)" << std::endl;
+		} else if (yellowBlobSeen || m_sFlockingParams.TargetDistance >= MAX_TARGET_DIST){
+			// stop expanding because we have reached the max communication range
+			m_sFlockingParams.TargetDistance = MAX_TARGET_DIST;
 			m_cLEDColor = CColor::YELLOW;
-			LOG << controllerID << ": blue -> yellow " << m_sFlockingParams.TargetDistance << std::endl;
+			LOG << controllerID << ": blue -> yellow (reached max TD or see yellow neighbor)" << std::endl;
 		}
 
 		if (unBlobsSeen == 0){
@@ -261,22 +271,38 @@ CVector2 CPathFindBot::FlockingVector() {
 			m_cLEDColor = CColor::GREEN;
 			LOG << controllerID << ": blue -> green (no neighbors)" << std::endl;
 		}
-	} else if (m_cLEDColor == CColor::YELLOW){
+	} else if (m_cLEDColor == CColor::ORANGE){
 		if (m_bFollowingNeighbor){
-			m_sFlockingParams.TargetDistance = m_vLOSNeighbors [m_nNeighborToFollow].TargetDistance + 0.1;
+			m_sFlockingParams.TargetDistance = m_vLOSNeighbors [m_nNeighborToFollow].TargetDistance - 10;
+		}
+		if (greenBlobSeen){
+			m_cLEDColor = CColor::RED;
+			LOG << controllerID << ": orange -> red (see lost neighbor)" << std::endl;
+		}
+	} else if (m_cLEDColor == CColor::YELLOW){
+		if (m_bNeighborLeftSwarm){
+			// let neighbors know one of our neighbors left the flock
+			m_sFlockingParams.TargetDistance = MAX_TARGET_DIST - 10;
+			m_bFollowingNeighbor = false;
+			m_cLEDColor = CColor::ORANGE;
+			LOG << controllerID << ": yellow -> orange (neighbor left flock)" << std::endl;
+		}
+		if (orangeBlobSeen){
+			m_cLEDColor = CColor::ORANGE;
+			LOG << controllerID << ": yellow -> orange (see orange neighbor)" << std::endl;
+		
 		}
 		if (unBlobsSeen == 0){
 			// we either escaped the local minima or are no longer in the communication range of our neighbors
 			m_cLEDColor = CColor::GREEN;
 			LOG << controllerID << ": yellow -> green (no neighbors)" << std::endl;
 		}
+		
 	} else if (m_cLEDColor == CColor::GREEN){
-		if (unBlobsSeen != 0){
-			if (redBlobSeen && unBlobsSeen == 5){
-				// our neighbors are ready to start descending to minima
-				m_cLEDColor = CColor::RED;
-				LOG << controllerID << ": green -> red (red neighbors)" << std::endl;
-			}
+		if (unBlobsSeen >= 3){
+			// our neighbors are ready to start descending to minima
+			m_cLEDColor = CColor::RED;
+			LOG << controllerID << ": green -> red (red neighbors)" << std::endl;
 		}
 	}
 	m_nNumNeighbors = unBlobsSeen;
@@ -299,7 +325,7 @@ Real CPathFindBot::updateWeightedAvgSpeed(Real prevWeightedAvg){
 
 	Real speedToTarget = ARGOS_COS((stepVelocity.Angle() - vecToTarget.Angle()).GetValue()) * stepVelocity.Length();
 	newWeightedAvg = prevWeightedAvg + AVG_WEIGHT * (speedToTarget - prevWeightedAvg);
-	m_cPrevPosition = currentPosition; // set for the next time step
+	m_cPrevPosition = currentPosition;
 
 	return newWeightedAvg;
 }
@@ -348,6 +374,17 @@ void CPathFindBot::updateLOSNeighbors(){
 			)
 		);
 	}
+
+	/*
+	if (controllerID == 3 && CSimulator::GetInstance().GetSpace().GetSimulationClock() > 2455){
+		LOG << "LOS neighbors:" << std::endl;
+		for (std::map <UInt32, SLOSNeighborState>::iterator it = m_vLOSNeighbors.begin(); it != m_vLOSNeighbors.end(); ++it){
+			LOG << "fb" << it->second.controllerID << ": " << it->second.numNeighbors << std::endl;
+		}
+		if (hadLoneNeighbor && m_vLOSNeighbors.find (loneNeighborID) == m_vLOSNeighbors.end()){
+			LOG << "neighbor left swarm" << std::endl;
+		}
+	}*/
 
 	// check to see if the neighbor we were following is still in line of sight
 	if (m_vLOSNeighbors.find (m_nNeighborToFollow) == m_vLOSNeighbors.end()){
@@ -481,14 +518,20 @@ void CPathFindBot::SetWheelSpeedsFromVector(const CVector2& c_heading) {
 /****************************************/
 
 void CPathFindBot::Reset(){
-   m_dWeightAvgSpeedTarget = 0;
-   m_sFlockingParams.TargetDistance = 75;
-   m_cPrevPosition = CVector2 (0, 0);
-   /* Enable camera filtering */
-   m_pcCamera->Enable();
-   /* Set beacon color to all red to be visible for other robots */
-   m_cLEDColor = CColor::RED;
-   //m_pcLEDs->SetSingleColor(12, m_cLEDColor);
+	if (!m_vLOSNeighbors.empty()){
+		m_vLOSNeighbors.clear();
+	}
+	m_bNeighborLeftSwarm = false;
+	m_bFollowingNeighbor;
+	m_nNumNeighbors = 0;
+	m_dWeightAvgSpeedTarget = 0;
+	m_sFlockingParams.TargetDistance = 75;
+	m_cPrevPosition = CVector2 (0, 0);
+	/* Enable camera filtering */
+	m_pcCamera->Enable();
+	/* Set beacon color to all red to be visible for other robots */
+	m_cLEDColor = CColor::RED;
+	//m_pcLEDs->SetSingleColor(12, m_cLEDColor);
 }
 
 /****************************************/

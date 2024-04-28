@@ -1,5 +1,43 @@
 /**
- * This is an example which borrows from the argos3-examples repository along with some modifications by our professor.
+ * Our project borrows from the argos3-examples repository along with some contributions by our professor.
+ *
+ * The goal of this project is to minimize the distance between the flock of robots and a target location, so it's a
+ * variation of gradient descent where every robot must arrive at the target together and overcome local minima along
+ * the way. 
+ *
+ * The motion of each robot is modelled as a Lennard-Jones fluid where the distance to its neighbors is governed by the
+ * Lennard-Jones potential so that robots repel each other when too close, attract each other when in the potential well,
+ * and do not affect each other when far apart. In addition, when they sense barriers, they are repelled from them.
+ *
+ * So in order to arrive at the target, the robots must be able to detect when they have reached a local minima. This is 
+ * done by calculating a weighted average of the velocity toward the target. When this average drops below a threshold,
+ * the robots increase their Brownian motion so that the flock expands until a robot escapes the local minima. When this 
+ * robot no longer has neighbors, it stops completely until it's seen by its neighbors.
+ *
+ * From the flock's perspective, the robot which has lost a neighbor with no other neighbors announces this and sets its
+ * Lennard-Jones potential well very high and other robots set theirs slightly below this value. This leads to a feedback
+ * loop where the robots with a higher potential well are repelled, and robots with a lower potential well are attracted,
+ * so that their collective trajectory is toward the robot which got separated from the flock.
+ *
+ *****************************************************************************************************************************
+ *
+ * For this to work, every robot keeps track of its neighbors with LEDs and camera sensors as well as range and bearing (RAB)
+ * sensors/actuators. With RAB hardware the robots are able to transmit 10 bytes of data per time step, but these messages 
+ * are susceptible to being blocked by other robots or barriers. This means that unifying neighbors' state is not a simple task.
+ *
+ * With the camera sensor, we can get a list of LEDs that we see with the following fields:
+ *   - color
+ *   - relative distance
+ *   - relative angle
+ *
+ * With range and bearing sensors, the robots announce:
+ *   - controller ID
+ *   - the number of neighbors they see with the camera sensor
+ *   - the value of their TargetDistance variable (or potential well, defined in SFlockingInteractionParams struct)
+ * 
+ * and the RAB sensor readings also provide the relative distance and relative angle of the robot which announced it.
+ * The distance and angle are used to tie information obtained from the camera sensors together to unify the state of 
+ * neighboring robots.
  */
 #ifndef CPATHFINDBOT_CONTROLLER_H
 #define CPATHFINDBOT_CONTROLLER_H
@@ -147,7 +185,7 @@ private:
 	/**
 	 * Update the weighted average of the speed to the target
 	 *
-	 * Look at the definition of the m_dWeightAvgSpeedTarget definition below for more info
+	 * parameter and value returned are m_dWeightAvgSpeedTarget
 	 */
 	Real updateWeightedAvgSpeed (Real prevWeightedAvg);
 
@@ -156,7 +194,9 @@ private:
 	 * so it will always contain neighbors in line of sight at every time step
 	 *
 	 * As a side effect, m_bNeighborLeftSwarm flag will be flipped if a neighbor with
-	 * no other neighbors is no longer visible. There's a small probability that
+	 * no other neighbors is no longer visible. 
+	 *
+	 * Note: There's a small probability that
 	 *   - a neighbor with no other neighbors disconnectes from us and connects to
 	 *     another robot in the same time step, or
 	 *   - a neighbor connected to 2 robots or more disconnects from all its neighbors
@@ -226,8 +266,8 @@ private:
 	 * needed for communication over RAB sensors/actuators.
 	 *
 	 * This structure is useful for 
-	 *   - determining if a neighbor has left the swarm and
-	 *   - getting neighbors' TargetDistance
+	 *   - determining if a neighbor has left the swarm
+	 *   - getting neighbors' ID and TargetDistance
 	 */
 	std::map <UInt32, SLOSNeighborState> m_vLOSNeighbors;
 	bool m_bNeighborLeftSwarm;

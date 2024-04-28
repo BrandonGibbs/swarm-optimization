@@ -106,7 +106,7 @@
       <position method="uniform" min="4,4,0" max="5,5,0" />
       <orientation method="gaussian" mean="0,0,0" std_dev="360,0,0" />
       <entity quantity="6" max_trials="100">
-	<foot-bot id="fb" omnidirectional_camera_aperture="80" rab_range="2">
+	      <foot-bot id="fb" omnidirectional_camera_aperture="80" rab_range="2">
           <controller config="ffc" />
         </foot-bot>
       </entity>
