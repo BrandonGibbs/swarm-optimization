@@ -1,18 +1,18 @@
 /**
  * Our project borrows from the argos3-examples repository along with some contributions by our professor.
  *
- * The goal of this project is to minimize the distance between the flock of robots and a target location, so it's a
+ * The goal of this project is to minimize the distance between a flock of robots and a target location, so it's a
  * variation of gradient descent where every robot must arrive at the target together and overcome local minima along
  * the way. 
  *
  * The motion of each robot is modelled as a Lennard-Jones fluid where the distance to its neighbors is governed by the
  * Lennard-Jones potential so that robots repel each other when too close, attract each other when in the potential well,
- * and do not affect each other when far apart. In addition, when they sense barriers, they are repelled from them.
+ * and do not affect each other when far apart. In addition, they are repelled from barriers.
  *
- * So in order to arrive at the target, the robots must be able to detect when they have reached a local minima. This is 
+ * So in order to arrive at the target, the robots must be able to detect when they have reached a local minimum. This is 
  * done by calculating a weighted average of the velocity toward the target. When this average drops below a threshold,
- * the robots increase their Brownian motion so that the flock expands until a robot escapes the local minima. When this 
- * robot no longer has neighbors, it stops completely until it's seen by its neighbors.
+ * the robots increase their Brownian motion so that the flock expands until a robot escapes the local minimum. When this 
+ * robot no longer has neighbors, it stops completely until it's seen.
  *
  * From the flock's perspective, the robot which has lost a neighbor with no other neighbors announces this and sets its
  * Lennard-Jones potential well very high and other robots set theirs slightly below this value. This leads to a feedback
@@ -24,6 +24,8 @@
  * For this to work, every robot keeps track of its neighbors with LEDs and camera sensors as well as range and bearing (RAB)
  * sensors/actuators. With RAB hardware the robots are able to transmit 10 bytes of data per time step, but these messages 
  * are susceptible to being blocked by other robots or barriers. This means that unifying neighbors' state is not a simple task.
+ * Bear in mind that variables, data structures, and methods with "LOS" in the name refer to data obtained from robots in 
+ * "line of sight".
  *
  * With the camera sensor, we can get a list of LEDs that we see with the following fields:
  *   - color
@@ -33,11 +35,11 @@
  * With range and bearing sensors, the robots announce:
  *   - controller ID
  *   - the number of neighbors they see with the camera sensor
- *   - the value of their TargetDistance variable (or potential well, defined in SFlockingInteractionParams struct)
+ *   - the value of their TargetDistance variable (defined in SFlockingInteractionParams struct)
  * 
  * and the RAB sensor readings also provide the relative distance and relative angle of the robot which announced it.
- * The distance and angle are used to tie information obtained from the camera sensors together to unify the state of 
- * neighboring robots.
+ * The distance and angle are used to tie information obtained from the camera sensors to messages received through
+ * the RAB sensor.
  */
 #ifndef CPATHFINDBOT_CONTROLLER_H
 #define CPATHFINDBOT_CONTROLLER_H
@@ -207,21 +209,12 @@ private:
 	void updateLOSNeighbors ();
 
 	/**
-	 * When our LED is blue and we see a yellow LED, we need to tie the yellow blob seen 
-	 * with the robot making announcements on RAB actuator so that we can calculate our
-	 * TargetDistance based on that robot's TargetDistance in later time steps. This value
+	 * When our LED is blue or yellow and we see an orange LED, we need to tie the orange  
+	 * blob seen with the robot making announcements on RAB actuator so that we can calculate 
+	 * our TargetDistance based on that robot's TargetDistance in later time steps. This value
 	 * is saved in m_nNeighborToFollow. If we have no neighbors, m_bFollowingNeighbor is false.
 	 */
 	UInt32 getLOSNeighborID (Real distance, CRadians angle);
-
-	/**
-	 * Get the TargetDistance of a neighbor.
-	 *
-	 * First, see if m_nNeighborToFollow is in m_vLOSNeighbors. If it's not, get the TargetDistance
-	 * nearest to that robot's position when we last saw them. This other robot's id will be stored in
-	 * m_nNeighborToFollow.
-	 */
-	float getTargetDistance();
 
 	/**
 	 * Announce 
@@ -251,7 +244,7 @@ private:
 	/**
 	 * The LED color will announce our flock state to others:
 	 * 	RED:    descending gradient to the target
-	 * 	BLUE:   reached a local minima => expand flock
+	 * 	BLUE:   reached a local minimum => expand flock
 	 * 	YELLOW: stop expanding flock
 	 * 	GREEN:  wait for neighbors to arrive, then guide flock out of LM
 	 */
@@ -264,19 +257,19 @@ private:
 	 * Keep in mind that this list will almost always be smaller than number of blobs
 	 * we can see with the camera sensor because other robots will block the line of sight
 	 * needed for communication over RAB sensors/actuators.
-	 *
-	 * This structure is useful for 
-	 *   - determining if a neighbor has left the swarm
-	 *   - getting neighbors' ID and TargetDistance
 	 */
 	std::map <UInt32, SLOSNeighborState> m_vLOSNeighbors;
 	bool m_bNeighborLeftSwarm;
-	UInt32 m_nNeighborToFollow; // id of LOS neighbor whose TargetDistance we need
-	bool m_bFollowingNeighbor;
+	UInt32 m_nNeighborToFollow; // "following" in this case means we're basing our TargetDistance
+	bool m_bFollowingNeighbor;  // on our neighbor's; having a smaller TargetDistance creates a 
+				    // feedback loop leading to collective movement in the direction
+				    // of the robot with the larger TargetDistance
 
 	/* 
 	 * weighted average of the speed to the target: the more recent the speed measurement, 
-	 * the greater the weight this is used to determine whether flock is in a local minima
+	 * the greater the weight
+	 *
+	 * this is used to determine whether the flock is in a local minimum
 	 */
 	Real m_dWeightAvgSpeedTarget;
 	CVector2 m_cPrevPosition; // this is needed to compute the weighted average speed
