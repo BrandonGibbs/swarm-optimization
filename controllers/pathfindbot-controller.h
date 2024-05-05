@@ -187,7 +187,7 @@ private:
 	/**
 	 * Update the weighted average of the speed to the target
 	 *
-	 * parameter and value returned are m_dWeightAvgSpeedTarget
+	 * The parameter and value returned are m_dWeightAvgSpeedTarget
 	 */
 	Real updateWeightedAvgSpeed (Real prevWeightedAvg);
 
@@ -226,6 +226,12 @@ private:
 	 */
 	void announceState ();
 
+	/**
+	 * Convert a position relative to this robot to an absolute position.
+	 */
+	CVector2 getAbsolutePosition (CVector2 relativePos);
+
+
 	CCI_DifferentialSteeringActuator          * m_pcWheels;
 	CCI_FootBotProximitySensor                * m_pcProximity;
 	CCI_PositioningSensor                     * m_pcPosSensor;
@@ -245,11 +251,16 @@ private:
 	 * The LED color will announce our flock state to others:
 	 * 	RED:    descending gradient to the target
 	 * 	BLUE:   reached a local minimum => expand flock
-	 * 	YELLOW: stop expanding flock
-	 * 	GREEN:  wait for neighbors to arrive, then guide flock out of LM
+	 * 	YELLOW: stop expanding flock (expanding more would break up the flock because of 
+	 * 	                              LED/camera communication range limit)
+	 * 	ORANGE: neighbor left the flock (for robots still in the flock; the robot which 
+	 *	                                 left turns green)
+	 * 	GREEN:  guide flock out of LM
+	 * 	WHITE:  escaped LM; waiting for the rest of the flock
 	 */
 	CColor m_cLEDColor;
 	UInt8 m_nNumNeighbors; // the number of blobs we can see with camera sensor
+
 
 	/**
 	 * Line of sight neighbors who we can communicate with over RAB sensors/actuators
@@ -264,6 +275,17 @@ private:
 	bool m_bFollowingNeighbor;  // on our neighbor's; having a smaller TargetDistance creates a 
 				    // feedback loop leading to collective movement in the direction
 				    // of the robot with the larger TargetDistance
+
+	/**
+	 * Our angle with respect to the robot with a green LED when it was first seen.
+	 *
+	 * This will be needed to get our change in angle with respect to green LED to determine if we've
+	 * been guided out of local minimum.
+	 */
+	CRadians m_cAngleWRTGreenFirstSeen;
+	bool m_bSeenGreenLED,
+	     m_bReadyToBreakAway; // this will be true when our angle WRT green LED is greater than some
+				  // threshold
 
 	/* 
 	 * weighted average of the speed to the target: the more recent the speed measurement, 
