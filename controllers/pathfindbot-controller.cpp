@@ -11,10 +11,9 @@
 
 #define LOCAL_MIN_THRESH 0.1  // when our weighted average velocity toward the target reaches this value,
 			      // we've decided we're in a local minimum
-#define LOCAL_MIN_ESC_THRESH 0.45 // this is when we've decided we've escaped
 
 #define SPREAD_RATE     0.1   // the rate at which TargetDistance parameter is increased to spread robots out
-#define CONTRACT_RATE   0.01  // the same as ^this but to contract as robots approach green LED
+#define CONTRACT_RATE   0.05  // the same as ^this but to contract as robots approach green LED
 
 #define MIN_TARGET_DIST 75    // these will be our minimum and maximum TargetDistance values for expansion/contraction
 #define MAX_TARGET_DIST 180
@@ -139,8 +138,8 @@ void CPathFindBot::ControlStep(){
 
 	if (m_cLEDColor == CColor::GREEN){
 		targetVec = flockVec = CVector2(0, 0);
-	} else if (m_cLEDColor == CColor::WHITE){
-		targetVec = CVector2(0, 0);
+	} else if (m_cLEDColor == CColor::ORANGE){
+		targetVec = CVector2 (0, 0);
 	}
 
 	if(m_sWheelTurningParams.m_cGoStraightAngleRange.WithinMinBoundIncludedMaxBoundIncluded(cAngle) &&
@@ -149,7 +148,8 @@ void CPathFindBot::ControlStep(){
 		SetWheelSpeedsFromVector(targetVec + flockVec);
 	} else {
 
-		if (m_bReadyToBreakAway && m_cLEDColor != CColor::WHITE){
+		if (m_bReadyToBreakAway && m_cLEDColor == CColor::ORANGE){
+			m_sFlockingParams.TargetDistance = MAX_TARGET_DIST - 20;
 			m_cLEDColor = CColor::WHITE;
 			LOG << "fb" << controllerID << ": orange -> white (change in angle W.R.T. green > pi & sensed barrier)" << std::endl;
 		}
@@ -217,20 +217,20 @@ CVector2 CPathFindBot::FlockingVector() {
 	     blueBlobSeen   = false,
 	     orangeBlobSeen = false,
 	     yellowBlobSeen = false,
-	     greenBlobSeen  = false,
-	     whiteBlobSeen  = false;
+	     greenBlobSeen  = false;
 
 	const CCI_ColoredBlobOmnidirectionalCameraSensor::SReadings & sCameraReadings = m_pcCamera->GetReadings();
 
 	for(CCI_ColoredBlobOmnidirectionalCameraSensor::TBlobList::const_iterator it = sCameraReadings.BlobList.begin();
 	it != sCameraReadings.BlobList.end(); ++it){
-		//if ((*it)->Distance < 1.8 * m_sFlockingParams.TargetDistance){
+		//if ((*it)->Distance < 1.8 * m_sFlockingParams.TargetDistance){ // values exceding this amount are out of range of camera sensor anyway
 			if ((m_cLEDColor == CColor::BLUE || m_cLEDColor == CColor::YELLOW) && (*it)->Color == CColor::ORANGE){
 				// if we see orange, we need to get that robot's id so we can determine our own TargetDistance
 				m_bFollowingNeighbor = true;
 				m_nNeighborToFollow = getLOSNeighborID ((*it)->Distance, (*it)->Angle);
 				LOG << "fb" << controllerID << " now following fb" << m_nNeighborToFollow << std::endl;
 			}
+
 
 			if (m_cLEDColor == CColor::ORANGE && (*it)->Color == CColor::GREEN){
 				// when we see green, we'll more than likely be very close, so we need to reduce its influence
@@ -260,15 +260,28 @@ CVector2 CPathFindBot::FlockingVector() {
 				if (m_bSeenGreenLED && !m_bReadyToBreakAway){
 					CVector3 position3D = m_pcPosSensor->GetReading().Position;
 					CVector2 absPos (position3D.GetX(), position3D.GetY()),
-					         greenAbsPos = getAbsolutePosition (
-					         	CVector2 ((*it)->Distance / 100, (*it)->Angle)
-					         );
+						 greenAbsPos = getAbsolutePosition (
+							CVector2 ((*it)->Distance / 100, (*it)->Angle)
+						 );
 					CRadians currentAngleWRTGreen = (greenAbsPos - absPos).Angle();
 
 					if ((currentAngleWRTGreen - m_cAngleWRTGreenFirstSeen).GetAbsoluteValue() > CRadians::PI.GetValue()){
 						m_bReadyToBreakAway = true;
 					}
 				}
+			} else if (m_cLEDColor == CColor::ORANGE && (*it)->Color == CColor::WHITE){
+				Real prevTD = m_sFlockingParams.TargetDistance;
+				m_sFlockingParams.TargetDistance = MIN_TARGET_DIST;
+				fLJ = m_sFlockingParams.GeneralizedLennardJones ((*it)->Distance);
+				m_sFlockingParams.TargetDistance = prevTD;
+			} else if (m_cLEDColor == CColor::WHITE && (*it)->Color != CColor::WHITE){
+				Real prevTD = m_sFlockingParams.TargetDistance;
+				m_sFlockingParams.TargetDistance = MAX_TARGET_DIST + 20;
+				fLJ = m_sFlockingParams.GeneralizedLennardJones ((*it)->Distance);
+				m_sFlockingParams.TargetDistance = prevTD;
+			} else if (m_cLEDColor == CColor::GREEN && (*it)->Color == CColor::WHITE){
+				UInt32 whiteRobotID = getLOSNeighborID ((*it)->Distance, (*it)->Angle);
+				m_vWhiteLEDsSeen.insert (whiteRobotID);
 			} else {
 				fLJ = m_sFlockingParams.GeneralizedLennardJones ((*it)->Distance);
 			}
@@ -281,12 +294,12 @@ CVector2 CPathFindBot::FlockingVector() {
 			orangeBlobSeen |= (*it)->Color == CColor::ORANGE;
 			yellowBlobSeen |= (*it)->Color == CColor::YELLOW;
 			 greenBlobSeen |= (*it)->Color == CColor::GREEN;
-			 whiteBlobSeen |= (*it)->Color == CColor::WHITE;
 
+			
 			if ((*it)->Color == CColor::GREEN && !m_bSeenGreenLED){
 				CVector3 position3D = m_pcPosSensor->GetReading().Position;
-				CVector2 absPos (position3D.GetX(), position3D.GetY()),
-				         greenAbsPos = getAbsolutePosition (
+				CVector2 absPos (position3D.GetX(), position3D.GetY());
+				CVector2 greenAbsPos = getAbsolutePosition (
 					CVector2 ((*it)->Distance / 100, (*it)->Angle)
 				);
 				m_cAngleWRTGreenFirstSeen = (greenAbsPos - absPos).Angle();
@@ -312,18 +325,21 @@ CVector2 CPathFindBot::FlockingVector() {
 		
 		// spread out to find an escape from local minimum
 		m_sFlockingParams.TargetDistance += SPREAD_RATE;
+
+		if (yellowBlobSeen || m_sFlockingParams.TargetDistance >= MAX_TARGET_DIST){
+			// stop expanding because we have reached the max communication range
+			m_sFlockingParams.TargetDistance = MAX_TARGET_DIST; // set explicitly to prevent slight differences
+			m_cLEDColor = CColor::YELLOW;
+			LOG << "fb" << controllerID << ": blue -> yellow (reached max TD or see yellow LED) " 
+			    << m_sFlockingParams.TargetDistance << std::endl;
+		}
+
 		if (m_bNeighborLeftSwarm){
 			// let neighbors know one of our neighbors left the flock
 			m_sFlockingParams.TargetDistance = MAX_TARGET_DIST;
 			m_bFollowingNeighbor = false;
 			m_cLEDColor = CColor::ORANGE;
 			LOG << "fb" << controllerID << ": blue -> orange (neighbor left flock) TD: " << m_sFlockingParams.TargetDistance << std::endl;
-		} else if (yellowBlobSeen || m_sFlockingParams.TargetDistance >= MAX_TARGET_DIST){
-			// stop expanding because we have reached the max communication range
-			m_sFlockingParams.TargetDistance = MAX_TARGET_DIST; // set explicitly to prevent slight differences
-			m_cLEDColor = CColor::YELLOW;
-			LOG << "fb" << controllerID << ": blue -> yellow (reached max TD or see yellow LED) " 
-			    << m_sFlockingParams.TargetDistance << std::endl;
 		} else if (orangeBlobSeen){
 			if (m_sFlockingParams.TargetDistance - TARGET_DIST_DIFF >= MIN_TARGET_DIST){
 				m_sFlockingParams.TargetDistance = m_vLOSNeighbors [m_nNeighborToFollow].TargetDistance - TARGET_DIST_DIFF;
@@ -331,27 +347,10 @@ CVector2 CPathFindBot::FlockingVector() {
 			m_cLEDColor = CColor::ORANGE;
 			LOG << "fb" << controllerID << ": blue -> orange (see orange neighbor fb" 
 			    << m_nNeighborToFollow << ") TD: " << m_sFlockingParams.TargetDistance << std::endl;
-		}
-
-		if (unBlobsSeen == 0){
+		} else if (unBlobsSeen == 0){
 			// we either escaped the local minimum or are no longer in the communication range of our neighbors
 			m_cLEDColor = CColor::GREEN;
 			LOG << "fb" << controllerID << ": blue -> green (no neighbors) TD: " << m_sFlockingParams.TargetDistance << std::endl;
-		}
-	} else if (m_cLEDColor == CColor::ORANGE){
-
-		if (unBlobsSeen == 0){
-			// we either escaped the local minimum or are no longer in the communication range of our neighbors
-			m_cLEDColor = CColor::GREEN;
-			LOG << "fb" << controllerID << ": orange -> green (no neighbors) TD: " << m_sFlockingParams.TargetDistance << std::endl;
-		} else if (!greenBlobSeen && unBlobsSeen >= 5 && m_sFlockingParams.TargetDistance >= MIN_TARGET_DIST){
-			// then we're not near green and have a lot of neighbors -> reduce spread to maintain a stable structure
-			m_sFlockingParams.TargetDistance -= CONTRACT_RATE;
-			//LOG << "fb" << controllerID << ": contracting (" << m_sFlockingParams.TargetDistance << ")" << std::endl;
-		} else if (greenBlobSeen && m_sFlockingParams.TargetDistance < MAX_TARGET_DIST){
-			// we're near green, increase TargetDistance to propel ourselves out of the local minimum
-			m_sFlockingParams.TargetDistance += SPREAD_RATE;
-			//LOG << "fb" << controllerID << ": spreading (" << m_sFlockingParams.TargetDistance << ")" << std::endl;
 		}
 	} else if (m_cLEDColor == CColor::YELLOW){
 
@@ -361,8 +360,7 @@ CVector2 CPathFindBot::FlockingVector() {
 			m_bFollowingNeighbor = false;
 			m_cLEDColor = CColor::ORANGE;
 			LOG << "fb" << controllerID << ": yellow -> orange (neighbor left flock) TD: " << m_sFlockingParams.TargetDistance << std::endl;
-		}
-		if (orangeBlobSeen){
+		} else if (orangeBlobSeen){
 			if (m_sFlockingParams.TargetDistance - TARGET_DIST_DIFF >= MIN_TARGET_DIST){
 				m_sFlockingParams.TargetDistance = m_vLOSNeighbors [m_nNeighborToFollow].TargetDistance - TARGET_DIST_DIFF;
 			}
@@ -375,12 +373,52 @@ CVector2 CPathFindBot::FlockingVector() {
 			m_cLEDColor = CColor::GREEN;
 			LOG << "fb" << controllerID << ": yellow -> green (no neighbors) TD: " << m_sFlockingParams.TargetDistance << std::endl;
 		}
+	} else if (m_cLEDColor == CColor::ORANGE){
+
+		if (unBlobsSeen == 0){
+			// we either escaped the local minimum or are no longer in the communication range of our neighbors
+			m_cLEDColor = CColor::GREEN;
+			LOG << "fb" << controllerID << ": orange -> green (no neighbors) TD: " << m_sFlockingParams.TargetDistance << std::endl;
+		} else if (!greenBlobSeen &&  m_sFlockingParams.TargetDistance >= MIN_TARGET_DIST){
+			// then we're not near green and have a lot of neighbors -> reduce spread to maintain a stable structure
+			//LOG << "fb" << controllerID << " contracting" << std::endl;
+			m_sFlockingParams.TargetDistance -= CONTRACT_RATE;
+		} else if (greenBlobSeen && m_sFlockingParams.TargetDistance < MAX_TARGET_DIST){
+			// we're near green, increase TargetDistance to propel ourselves out of the local minimum
+			//LOG << "fb" << controllerID << " spreading" << std::endl;
+			m_sFlockingParams.TargetDistance += SPREAD_RATE;
+		}
+
+		if (redBlobSeen){
+			m_sFlockingParams.TargetDistance = MIN_TARGET_DIST;
+			m_dWeightAvgSpeedTarget = 5;
+			m_cLEDColor = CColor::RED;
+			LOG << "fb" << controllerID << ": orange -> red (see red neighbor) TD: " << m_sFlockingParams.TargetDistance << std::endl;
+		}
+
 	} else if (m_cLEDColor == CColor::GREEN){
-		// count robots which have escaped LM
+		if (m_vWhiteLEDsSeen.size() == 13){
+			m_sFlockingParams.TargetDistance = MIN_TARGET_DIST;
+			m_dWeightAvgSpeedTarget = 5;
+			m_cLEDColor = CColor::RED;
+			LOG << "fb" << controllerID << ": green -> red (no robots left to wait for) TD: " << m_sFlockingParams.TargetDistance << std::endl;
+
+			for (std::set<UInt32>::iterator it = m_vWhiteLEDsSeen.begin(); it != m_vWhiteLEDsSeen.end(); ++it){
+				LOG << " " << *it;
+			}
+			LOG << std::endl;
+		}
 
 	} else if (m_cLEDColor == CColor::WHITE){
 		if (m_sFlockingParams.TargetDistance > MIN_TARGET_DIST){
-			m_sFlockingParams.TargetDistance -= CONTRACT_RATE;
+			m_sFlockingParams.TargetDistance -= SPREAD_RATE;
+		}
+
+		if (redBlobSeen){
+			m_sFlockingParams.TargetDistance = MIN_TARGET_DIST;
+			m_dWeightAvgSpeedTarget = 5;
+			m_cLEDColor = CColor::RED;
+			LOG << "fb" << controllerID << ": white -> red (see red neighbor) TD: " << m_sFlockingParams.TargetDistance << std::endl;
 		}
 	}
 
@@ -415,25 +453,22 @@ Real CPathFindBot::updateWeightedAvgSpeed(Real prevWeightedAvg){
 void CPathFindBot::updateLOSNeighbors(){
 
 	const CCI_RangeAndBearingSensor::TReadings & tRABReadings = m_pcRABSensor->GetReadings();
-	bool hadLoneNeighbor = false;
-	UInt32 loneNeighborID;
+	std::vector <UInt32> loneNeighborIDs;
 	UInt8 prevNumLOSNeighbors = m_vLOSNeighbors.size();
 
 	// save in case we need to update m_nNeighborToFollow
 	CVector2 prevNeighborToFollowLoc;
+
 	if (m_bFollowingNeighbor){
-       
 		prevNeighborToFollowLoc = CVector2(
 			m_vLOSNeighbors [m_nNeighborToFollow].distance, 
-			m_vLOSNeighbors[m_nNeighborToFollow].angle
+			m_vLOSNeighbors [m_nNeighborToFollow].angle
 		);
 	}
 
-	for (int i = 0; i< prevNumLOSNeighbors; i++){
-		if (m_vLOSNeighbors[i].numNeighbors == 1){
-			loneNeighborID = m_vLOSNeighbors[i].controllerID;
-			hadLoneNeighbor = true;
-			break;
+	for (std::map <UInt32, SLOSNeighborState>::iterator it = m_vLOSNeighbors.begin(); it != m_vLOSNeighbors.end(); ++it){
+		if (it->second.numNeighbors == 1){
+			loneNeighborIDs.push_back(it->first);
 		}
 	}
 	m_vLOSNeighbors.clear();
@@ -452,7 +487,6 @@ void CPathFindBot::updateLOSNeighbors(){
 
 		m_vLOSNeighbors [neighborID] = (
 			SLOSNeighborState(
-				neighborID,
 				numNeighbors,
 				it->Range,
 				it->HorizontalBearing,
@@ -461,16 +495,21 @@ void CPathFindBot::updateLOSNeighbors(){
 		);
 	}
 
+	
 	/*
-	if (CSimulator::GetInstance().GetSpace().GetSimulationClock() >= 2079
-	&& CSimulator::GetInstance().GetSpace().GetSimulationClock() <= 2085){
+	if (controllerID == 4 && CSimulator::GetInstance().GetSpace().GetSimulationClock() >= 1864
+	&& CSimulator::GetInstance().GetSpace().GetSimulationClock() <= 1870){
 		LOG << "fb" << controllerID << "'s LOS neighbors:" << std::endl;
 		for (std::map <UInt32, SLOSNeighborState>::iterator it = m_vLOSNeighbors.begin(); it != m_vLOSNeighbors.end(); ++it){
-			LOG << "fb" << it->second.controllerID << ": " << it->second.numNeighbors << ", "
+			LOG << "fb" << it->first << ": " << it->second.numNeighbors << ", "
 			    << it->second.TargetDistance << std::endl;
 		}
-		if (hadLoneNeighbor && m_vLOSNeighbors.find (loneNeighborID) == m_vLOSNeighbors.end()){
-			LOG << "neighbor left swarm" << std::endl;
+		if (loneNeighborIDs.size() > 0){
+			LOG << "lone neighbors: " << std::endl;
+			for (std::vector<UInt32>::iterator it = loneNeighborIDs.begin(); it != loneNeighborIDs.end(); ++it){
+				LOG << " fb" << *it;
+			}
+			LOG << std::endl;
 		}
 	}*/
 	
@@ -479,10 +518,18 @@ void CPathFindBot::updateLOSNeighbors(){
 		// if it's not, the neighbor nearest to the one we were following is now the one we're following
 		m_nNeighborToFollow = getLOSNeighborID (prevNeighborToFollowLoc.Length(), prevNeighborToFollowLoc.Angle());
 		// the TargetDistance has to be the same, otherwise all TargetDistances reduce until there's no distance between the robots
-		m_sFlockingParams.TargetDistance = m_vLOSNeighbors [m_nNeighborToFollow].TargetDistance;
+		//m_sFlockingParams.TargetDistance = m_vLOSNeighbors [m_nNeighborToFollow].TargetDistance;
+		//LOG << "fb" << controllerID << " now following fb" << m_nNeighborToFollow << std::endl;
 	}
 
-	m_bNeighborLeftSwarm = hadLoneNeighbor && m_vLOSNeighbors.find (loneNeighborID) == m_vLOSNeighbors.end();
+	if (loneNeighborIDs.size() > 0){
+		for (std::vector<UInt32>::iterator it = loneNeighborIDs.begin(); it != loneNeighborIDs.end(); ++it){
+			if (m_vLOSNeighbors.find (*it) == m_vLOSNeighbors.end()){
+				m_bNeighborLeftSwarm = true;
+				break;
+			}
+		}
+	}
 }
 
 /****************************************/
@@ -499,7 +546,7 @@ UInt32 CPathFindBot::getLOSNeighborID (Real distance, CRadians angle){
 		Real diff = (robotOfInterestLoc - CVector2(it->second.distance, it->second.angle)).Length();
 		if (diff < minDistance){
 			minDistance = diff;
-			id = it->second.controllerID;
+			id = it->first;
 		}
 	}
 	return id;
@@ -533,6 +580,9 @@ void CPathFindBot::announceState(){
 
 	m_pcRABActuator->SetData(message);
 }
+
+/****************************************/
+/****************************************/
 
 CVector2 CPathFindBot::getAbsolutePosition (CVector2 relativePos){
 	CVector3 position3D = m_pcPosSensor->GetReading().Position;
@@ -622,6 +672,9 @@ void CPathFindBot::SetWheelSpeedsFromVector(const CVector2& c_heading) {
 void CPathFindBot::Reset(){
 	if (!m_vLOSNeighbors.empty()){
 		m_vLOSNeighbors.clear();
+	}
+	if (!m_vWhiteLEDsSeen.empty()){
+		m_vWhiteLEDsSeen.clear();
 	}
 	m_bNeighborLeftSwarm = false;
 	m_bFollowingNeighbor = false;

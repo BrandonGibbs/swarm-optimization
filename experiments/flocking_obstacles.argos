@@ -105,8 +105,13 @@
     <distribute>
       <position method="uniform" min="4,4,0" max="5,5,0" />
       <orientation method="gaussian" mean="0,0,0" std_dev="360,0,0" />
-      <entity quantity="11" max_trials="100">
-	      <foot-bot id="fb" omnidirectional_camera_aperture="80" rab_range="2">
+      <entity quantity="14" max_trials="100">
+              <!-- 
+                  The rab_range has to be as close as possible to the range of the 
+                  camera sensor. Otherwise, the robots report false positive lost
+                  lone neighbors.
+	      -->
+	      <foot-bot id="fb" omnidirectional_camera_aperture="80" rab_range="1.85">
           <controller config="ffc" />
         </foot-bot>
       </entity>
@@ -138,7 +143,7 @@
         <placements>
           <!--placement index="0" position="3.47447,8.20587,3.42167" look_at="3.94263,7.5512,2.82817" up="0.345221,-0.48276,0.804839" lens_focal_length="20" /-->
 	  <placement index="0" position="8.56539,8.47383,2.34882" look_at="8.37836,7.63434,1.83864" up="-0.110942,-0.497974,0.860066" lens_focal_length="20" />
-	  <!--placement index="0" position="3.54965,0.79279,2.50475" look_at="4.209,1.33697,1.98598" up="0.400092,0.330206,0.854921" lens_focal_length="20" /-->
+	  <placement index="1" position="3.8655,0.00915738,2.53974" look_at="4.3458,0.639915,1.93027" up="0.369232,0.484893,0.792809" lens_focal_length="20" />
         </placements>
       </camera>
       <user_functions label="flocking_qt_user_functions" />

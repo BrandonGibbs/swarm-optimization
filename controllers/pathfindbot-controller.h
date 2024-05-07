@@ -52,6 +52,7 @@
 #include <argos3/plugins/robots/generic/control_interface/ci_range_and_bearing_sensor.h>
 #include <argos3/plugins/robots/generic/control_interface/ci_range_and_bearing_actuator.h>
 #include <argos3/core/utility/math/vector2.h>
+#include <set>
 
 using namespace argos;
 
@@ -158,14 +159,14 @@ public:
 	 * See definition of m_vLOSNeighbors below for more info
 	 */
 	struct SLOSNeighborState {
-		UInt32   controllerID;
 		UInt8    numNeighbors;
 		Real     distance;
 		CRadians angle;
 		float    TargetDistance;
+
 		SLOSNeighborState()=default;
-		SLOSNeighborState(UInt32 id, UInt8 nn, Real d, CRadians a, float td):
-			controllerID(id), numNeighbors(nn), distance(d), angle(a), TargetDistance(td){}
+		SLOSNeighborState(UInt8 nn, Real d, CRadians a, float td):
+			numNeighbors(nn), distance(d), angle(a), TargetDistance(td){}
 	};
 
 	CPathFindBot();
@@ -213,6 +214,8 @@ private:
 	 * blob seen with the robot making announcements on RAB actuator so that we can calculate 
 	 * our TargetDistance based on that robot's TargetDistance in later time steps. This value
 	 * is saved in m_nNeighborToFollow. If we have no neighbors, m_bFollowingNeighbor is false.
+	 *
+	 * The default parameter maxThreshold will be a maximum distance error allowed.
 	 */
 	UInt32 getLOSNeighborID (Real distance, CRadians angle);
 
@@ -275,6 +278,12 @@ private:
 	bool m_bFollowingNeighbor;  // on our neighbor's; having a smaller TargetDistance creates a 
 				    // feedback loop leading to collective movement in the direction
 				    // of the robot with the larger TargetDistance
+	
+	/**
+	 * The robot with the green LED will store the IDs of the robots with white LEDs it has seen
+	 * here. Once it's full, green is ready to turn its LED red to continue descent toward target.
+	 */
+	std::set <UInt32> m_vWhiteLEDsSeen;
 
 	/**
 	 * Our angle with respect to the robot with a green LED when it was first seen.
