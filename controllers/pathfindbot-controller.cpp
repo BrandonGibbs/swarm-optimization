@@ -383,7 +383,7 @@ CVector2 CPathFindBot::FlockingVector() {
 			m_cLEDColor = CColor::GREEN;
 			LOG << "fb" << controllerID << ": orange -> green (no neighbors) TD: " << m_sFlockingParams.TargetDistance << std::endl;
 		} else if (!greenBlobSeen &&  m_sFlockingParams.TargetDistance >= MIN_TARGET_DIST){
-			// then we're not near green and have a lot of neighbors -> reduce spread to maintain a stable structure
+			// then we're not near green  -> reduce spread to maintain a stable structure
 			//LOG << "fb" << controllerID << " contracting" << std::endl;
 			m_sFlockingParams.TargetDistance -= CONTRACT_RATE;
 		} else if (greenBlobSeen && m_sFlockingParams.TargetDistance < MAX_TARGET_DIST){
@@ -399,6 +399,7 @@ CVector2 CPathFindBot::FlockingVector() {
 		}
 
 	} else if (m_cLEDColor == CColor::GREEN){
+		// once we've seen every robot escape the local minimum, we're ready to keep descending gradient
 		if (m_vWhiteLEDsSeen.size() == m_nTotalNumRobots - 1){
 			Reset();
 			m_cLEDColor = CColor::RED;
@@ -453,10 +454,10 @@ Real CPathFindBot::updateWeightedAvgSpeed(Real prevWeightedAvg){
 void CPathFindBot::updateLOSNeighbors(){
 
 	const CCI_RangeAndBearingSensor::TReadings & tRABReadings = m_pcRABSensor->GetReadings();
-	std::vector <UInt32> loneNeighborIDs;
-	UInt8 prevNumLOSNeighbors = m_vLOSNeighbors.size();
+	std::vector <UInt32> loneNeighborIDs;               // IDs of neighbors with only one neighbor
+	UInt8 prevNumLOSNeighbors = m_vLOSNeighbors.size(); // the number of LOS neighbors we had last time step
 
-	// save in case we need to update m_nNeighborToFollow
+	// save the location of the neighbor we were following in case we need to update m_nNeighborToFollow
 	CVector2 prevNeighborToFollowLoc;
 
 	if (m_bFollowingNeighbor){

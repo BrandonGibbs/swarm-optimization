@@ -1,23 +1,38 @@
 /**
- * Our project borrows from the argos3-examples repository along with some contributions by our professor.
+ * Our project borrows from the argos3-examples repository along with some insightful contributions by our professor.
  *
- * The goal of this project is to minimize the distance between a flock of robots and a target location, so it's a
- * variation of gradient descent where every robot must arrive at the target together and overcome local minima along
- * the way. 
+ * The goal of this project is to minimize the distance between a flock of robots and a target location while keeping
+ * the flock from separating, so it's a variation of gradient descent where every robot must arrive at the target 
+ * together and overcome local minima along the way. 
  *
  * The motion of each robot is modelled as a Lennard-Jones fluid where the distance to its neighbors is governed by the
  * Lennard-Jones potential so that robots repel each other when too close, attract each other when in the potential well,
- * and do not affect each other when far apart. In addition, they are repelled from barriers.
+ * and do not affect each other when far apart. In addition, they are repelled from barriers by basic diffusion.
  *
  * So in order to arrive at the target, the robots must be able to detect when they have reached a local minimum. This is 
  * done by calculating a weighted average of the velocity toward the target. When this average drops below a threshold,
  * the robots increase their Brownian motion so that the flock expands until a robot escapes the local minimum. When this 
- * robot no longer has neighbors, it stops completely until it's seen.
+ * robot no longer has neighbors, it stops completely until the rest of the robots are seen and are ready to continue
+ * descending toward the target.
  *
  * From the flock's perspective, the robot which has lost a neighbor with no other neighbors announces this and sets its
  * Lennard-Jones potential well very high and other robots set theirs slightly below this value. This leads to a feedback
  * loop where the robots with a higher potential well are repelled, and robots with a lower potential well are attracted,
  * so that their collective trajectory is toward the robot which got separated from the flock.
+ *
+ * While having different potential wells is good for regrouping the flock near where the robot was lost, it's bad for 
+ * maintaining a stable structure when waiting to be pulled out of the local minimum. For this reason the potential well is  
+ * slowly reduced until the lost robot is seen. When it is seen, the robot trying to escape the local minimum increases its 
+ * potential well to repel from neighbors behind it and to increase the influence of the lost robot.
+ *
+ * To "pull" the robots around the barrier, the influence of the lost robot is modified to control the chaotic behavior of
+ * robots with different potential wells. Since we still want to avoid collisions, the force repels when robots are nearby,
+ * but it also attracts when neighbors get too far. This was done by shifting the domain of one Lennard Jones potential 
+ * function, and summing it with another Lennard Jones potential function which is otherwise the same. In addition, there 
+ * is a small push perpendicular to the direction of the lost robot to ensure there is always flow out of the local minimum.
+ *
+ * Finally, the lost robot counts the number of robots it has "pulled" out of the local minimum and when all have been 
+ * pulled out, it notifies the waiting flock that it's time to keep descending toward global minimum.
  *
  *****************************************************************************************************************************
  *
@@ -211,11 +226,17 @@ private:
 
 	/**
 	 * When our LED is blue or yellow and we see an orange LED, we need to tie the orange  
-	 * blob seen with the robot making announcements on RAB actuator so that we can calculate 
-	 * our TargetDistance based on that robot's TargetDistance in later time steps. This value
-	 * is saved in m_nNeighborToFollow. If we have no neighbors, m_bFollowingNeighbor is false.
+	 * blob seen using the camera sensor with the messages received by the RAB sensor. Using 
+	 * the relative polar vector obtained with the camera sensor, we can determine which RAB 
+	 * message is the one received from the robot with the orange LED. We then get the 
+	 * TargetDistance value from the message and set ours to a value below it.
 	 *
-	 * The default parameter maxThreshold will be a maximum distance error allowed.
+	 * Real robots with camera/RAB sensors are obviously not going to provide exact relative 
+	 * locations of neighboring robots, so we decide which RAB message is relevant based on its
+	 * distance to the relative position seen with the camera. The smallest value is picked.
+	 *
+	 * The value returned is the ID of the robot, and the parameters are the components of the
+	 * relative polar coordinate of the blob seen with the camera.
 	 */
 	UInt32 getLOSNeighborID (Real distance, CRadians angle);
 
