@@ -223,7 +223,7 @@ CVector2 CPathFindBot::FlockingVector() {
 
 	for(CCI_ColoredBlobOmnidirectionalCameraSensor::TBlobList::const_iterator it = sCameraReadings.BlobList.begin();
 	it != sCameraReadings.BlobList.end(); ++it){
-		//if ((*it)->Distance < 1.8 * m_sFlockingParams.TargetDistance){ // values exceding this amount are out of range of camera sensor anyway
+		//if ((*it)->Distance < 1.8 * m_sFlockingParams.TargetDistance){
 			if ((m_cLEDColor == CColor::BLUE || m_cLEDColor == CColor::YELLOW) && (*it)->Color == CColor::ORANGE){
 				// if we see orange, we need to get that robot's id so we can determine our own TargetDistance
 				m_bFollowingNeighbor = true;
@@ -349,6 +349,7 @@ CVector2 CPathFindBot::FlockingVector() {
 			    << m_nNeighborToFollow << ") TD: " << m_sFlockingParams.TargetDistance << std::endl;
 		} else if (unBlobsSeen == 0){
 			// we either escaped the local minimum or are no longer in the communication range of our neighbors
+			m_nTotalNumRobots = CSimulator::GetInstance().GetSpace().GetEntitiesByType("foot-bot").size();
 			m_cLEDColor = CColor::GREEN;
 			LOG << "fb" << controllerID << ": blue -> green (no neighbors) TD: " << m_sFlockingParams.TargetDistance << std::endl;
 		}
@@ -370,6 +371,7 @@ CVector2 CPathFindBot::FlockingVector() {
 		
 		} else if (unBlobsSeen == 0){
 			// we either escaped the local minimum or are no longer in the communication range of our neighbors
+			m_nTotalNumRobots = CSimulator::GetInstance().GetSpace().GetEntitiesByType("foot-bot").size();
 			m_cLEDColor = CColor::GREEN;
 			LOG << "fb" << controllerID << ": yellow -> green (no neighbors) TD: " << m_sFlockingParams.TargetDistance << std::endl;
 		}
@@ -377,6 +379,7 @@ CVector2 CPathFindBot::FlockingVector() {
 
 		if (unBlobsSeen == 0){
 			// we either escaped the local minimum or are no longer in the communication range of our neighbors
+			m_nTotalNumRobots = CSimulator::GetInstance().GetSpace().GetEntitiesByType("foot-bot").size();
 			m_cLEDColor = CColor::GREEN;
 			LOG << "fb" << controllerID << ": orange -> green (no neighbors) TD: " << m_sFlockingParams.TargetDistance << std::endl;
 		} else if (!greenBlobSeen &&  m_sFlockingParams.TargetDistance >= MIN_TARGET_DIST){
@@ -390,16 +393,14 @@ CVector2 CPathFindBot::FlockingVector() {
 		}
 
 		if (redBlobSeen){
-			m_sFlockingParams.TargetDistance = MIN_TARGET_DIST;
-			m_dWeightAvgSpeedTarget = 5;
+			Reset();
 			m_cLEDColor = CColor::RED;
 			LOG << "fb" << controllerID << ": orange -> red (see red neighbor) TD: " << m_sFlockingParams.TargetDistance << std::endl;
 		}
 
 	} else if (m_cLEDColor == CColor::GREEN){
-		if (m_vWhiteLEDsSeen.size() == 13){
-			m_sFlockingParams.TargetDistance = MIN_TARGET_DIST;
-			m_dWeightAvgSpeedTarget = 5;
+		if (m_vWhiteLEDsSeen.size() == m_nTotalNumRobots - 1){
+			Reset();
 			m_cLEDColor = CColor::RED;
 			LOG << "fb" << controllerID << ": green -> red (no robots left to wait for) TD: " << m_sFlockingParams.TargetDistance << std::endl;
 
@@ -415,8 +416,7 @@ CVector2 CPathFindBot::FlockingVector() {
 		}
 
 		if (redBlobSeen){
-			m_sFlockingParams.TargetDistance = MIN_TARGET_DIST;
-			m_dWeightAvgSpeedTarget = 5;
+			Reset();
 			m_cLEDColor = CColor::RED;
 			LOG << "fb" << controllerID << ": white -> red (see red neighbor) TD: " << m_sFlockingParams.TargetDistance << std::endl;
 		}
@@ -525,8 +525,8 @@ void CPathFindBot::updateLOSNeighbors(){
 	if (loneNeighborIDs.size() > 0){
 		for (std::vector<UInt32>::iterator it = loneNeighborIDs.begin(); it != loneNeighborIDs.end(); ++it){
 			if (m_vLOSNeighbors.find (*it) == m_vLOSNeighbors.end()){
-				m_bNeighborLeftSwarm = true;
-				break;
+				m_bNeighborLeftSwarm |= true;
+				LOG << "fb" << controllerID << ": lost lone neighbor fb" << *it << std::endl;
 			}
 		}
 	}
@@ -588,7 +588,6 @@ CVector2 CPathFindBot::getAbsolutePosition (CVector2 relativePos){
 	CVector3 position3D = m_pcPosSensor->GetReading().Position;
 	CVector2 position (position3D.GetX(), position3D.GetY());
 	CQuaternion orientation = m_pcPosSensor->GetReading().Orientation;
-	/* convert the quaternion to euler angles */
 	CRadians z_angle, y_angle, x_angle;
 	orientation.ToEulerAngles(z_angle, y_angle, x_angle);
 
@@ -681,8 +680,8 @@ void CPathFindBot::Reset(){
 	m_bSeenGreenLED = false;
 	m_bReadyToBreakAway = false;
 	m_nNumNeighbors = 0;
-	m_dWeightAvgSpeedTarget = 0;
-	m_sFlockingParams.TargetDistance = 75;
+	m_dWeightAvgSpeedTarget = 20;
+	m_sFlockingParams.TargetDistance = MIN_TARGET_DIST;
 	m_cPrevPosition = CVector2 (0, 0);
 	/* Enable camera filtering */
 	m_pcCamera->Enable();

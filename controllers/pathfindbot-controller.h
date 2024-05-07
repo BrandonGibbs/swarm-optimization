@@ -284,6 +284,7 @@ private:
 	 * here. Once it's full, green is ready to turn its LED red to continue descent toward target.
 	 */
 	std::set <UInt32> m_vWhiteLEDsSeen;
+	int m_nTotalNumRobots;
 
 	/**
 	 * Our angle with respect to the robot with a green LED when it was first seen.
